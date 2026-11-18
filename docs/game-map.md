@@ -411,3 +411,6 @@ draggables (spawned at runtime — will need `MissionSaveIdentity` instead).
   removed the moment it quit (`removed player 1 (left)` + "Guest #1 left the session"); leaderboard taint logged and
   `LeaderboardManager.OptOut` forced (FIRST HIT); joining with no host → "couldn't reach the host" after ~5.6 s, clean
   stop. Not testable locally: PlayerLeft reaching other guests, guest-side "Host left", Steam Reject text.
+- **Esc / ` behaviour (user request):** Esc with the co-op menu open closes only the co-op menu (prefix on
+  `HandleActionStarted` returns false, so the Esc menu doesn't open); Esc otherwise is untouched. ` with the Esc menu
+  open closes only the Esc menu; the next ` opens the co-op menu. ` with the co-op menu open closes it.

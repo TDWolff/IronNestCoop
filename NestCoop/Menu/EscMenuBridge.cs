@@ -17,16 +17,18 @@ internal static class EscMenuBridge
         Registry.All<EscapeMenuToggleUnityEvent>().FirstOrDefault(m => m != null && m.IsOpen);
 
     /// <summary>Called by CoopMenu.Open before raising our clipboard.</summary>
-    public static void CloseEscMenuIfOpen()
+    /// <summary>Close the game's Esc menu if it's open. True if it was open.</summary>
+    public static bool CloseEscMenuIfOpen()
     {
         var esc = OpenEscMenu();
-        if (esc == null) return;
-        Mod.Log.Msg("Menu: closing the Esc menu to show the co-op menu");
+        if (esc == null) return false;
+        Mod.Log.Msg("Menu: closing the Esc menu");
         try
         {
             if (!esc.TrySetOpen(false)) esc.ForceClose(true);
         }
         catch (Exception e) { Mod.Log.Warning($"Menu: couldn't close the Esc menu: {e.Message}"); }
+        return true;
     }
 
     /// <summary>The game is about to open its Esc menu: put ours away first so its cursor setup wins.</summary>
@@ -62,10 +64,14 @@ static class EscMenu_TrySetOpen
 [HarmonyPatch(typeof(EscapeMenuToggleUnityEvent), nameof(EscapeMenuToggleUnityEvent.HandleActionStarted))]
 static class EscMenu_HandleActionStarted
 {
-    // Esc pressed: if our menu is open, Esc means "swap to the Esc menu" — close ours first.
-    static void Prefix(EscapeMenuToggleUnityEvent __instance)
+    // Esc pressed while the co-op menu is open: Esc just closes the co-op menu (user request) and the game's Esc
+    // menu does NOT open — skip the game's handler. With the co-op menu closed, Esc works exactly as normal.
+    static bool Prefix()
     {
         PatchLog.Hit("EscapeMenuToggleUnityEvent.HandleActionStarted");
-        if (!__instance.IsOpen) EscMenuBridge.BeforeEscMenuOpens();
+        if (!CoopMenu.IsOpen) return true;
+        Mod.Log.Msg("Menu: Esc closes the co-op menu");
+        CoopMenu.Close();
+        return false;
     }
 }

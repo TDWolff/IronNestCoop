@@ -84,7 +84,16 @@ internal static class CoopMenu
 
     // ---------------- Open / close ----------------
 
-    public static void Toggle() { if (IsOpen) Close(); else Open(); }
+    /// <summary>
+    /// The ` key: closes the co-op menu if it's open; if the game's Esc menu is open, closes just that (press ` again
+    /// for the co-op menu); otherwise opens the co-op menu.
+    /// </summary>
+    public static void Toggle()
+    {
+        if (IsOpen) { Close(); return; }
+        if (EscMenuBridge.CloseEscMenuIfOpen()) return;
+        Open();
+    }
 
     public static void Open()
     {
