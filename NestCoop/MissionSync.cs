@@ -26,7 +26,7 @@ namespace NestCoop;
 /// </summary>
 internal static class MissionSync
 {
-    public enum EventKind : byte { Finish = 1 }
+    public enum EventKind : byte { Finish = 1, Complete = 2, Failed = 3 }
 
     readonly struct State : IEquatable<State>
     {
@@ -82,6 +82,14 @@ internal static class MissionSync
         Mod.Log.Msg($"MissionSync: {why} -> {st}");
         if (Net.Role == Role.Host && Net.CanSend)
             Net.Broadcast(WriteState(st), reliable: true);
+    }
+
+    /// <summary>Host decided the mission is won/failed: tell the guests (they don't decide it themselves).</summary>
+    public static void OnHostVerdict(EventKind kind, bool force)
+    {
+        if (Net.Role != Role.Host || !Net.CanSend) return;
+        Net.Broadcast(Net.Write(MsgType.MissionEvent, w => { w.Write((byte)kind); w.Write(force); }), reliable: true);
+        Mod.Log.Msg($"MissionSync: sent {kind}");
     }
 
     public static void OnLocalFinish()
@@ -170,8 +178,11 @@ internal static class MissionSync
         else if (type == MsgType.MissionEvent)
         {
             var kind = (EventKind)r.ReadByte();
+            bool force = r.BaseStream.Position < r.BaseStream.Length && r.ReadBoolean();
             if (Net.Role != Role.Guest) return;
             if (kind == EventKind.Finish) Run("FinishMission", mm => mm.FinishMission());
+            else if (kind == EventKind.Complete) Run("MarkMissionComplete", mm => mm.MarkMissionComplete(force));
+            else if (kind == EventKind.Failed) Run("MarkMissionFailed", mm => mm.MarkMissionFailed(force));
         }
     }
 

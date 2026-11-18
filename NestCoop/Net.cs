@@ -114,6 +114,7 @@ internal static class Net
         ControlSync.Reset();
         MissionSync.Reset();
         Combat.Reset();
+        CoopPause.Reset();
         Avatars.Reset();
         t.Stop();
     }

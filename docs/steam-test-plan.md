@@ -1,12 +1,12 @@
-# Two-player Steam test plan (NestCoop 0.9.0)
+# Two-player Steam test plan (NestCoop 0.9.1)
 
 Everything below can only be checked with **two PCs and two Steam accounts that both own IRON NEST** (the game won't
 run twice on one PC, and Steam can't connect you to yourself). Tick items off as you go; after the session, send the
 `MelonLoader/Latest.log` from **both** profiles.
 
 ## Setup (both players)
-- [ ] Same game build (log line `NestCoop 0.9.0 loaded (key NestCoop|0.9.0|<game build>)` must show the same key).
-- [ ] Import `TDWolff-NestCoop-0.9.0.zip` in r2modman (Settings → Import local mod) into a **fresh** profile.
+- [ ] Same game build (log line `NestCoop 0.9.1 loaded (key NestCoop|0.9.1|<game build>)` must show the same key).
+- [ ] Import `TDWolff-NestCoop-0.9.1.zip` in r2modman (Settings → Import local mod) into a **fresh** profile.
 - [ ] Launch once, quit, set in `UserData/MelonPreferences.cfg` under `[NestCoop]`:
       `Transport = "Steam"` and `DebugLog = true` (for the test logs).
 - [ ] Be Steam friends; both in the game's main menu.
@@ -49,7 +49,12 @@ run twice on one PC, and Steam can't connect you to yourself). Tick items off as
 - [ ] Guest quits the game → host sees "Guest #1 left the session", avatar gone immediately.
 - [ ] Host quits → guest sees "Host left the session"; guest's game stays usable.
 
-## 7. Leaderboards
+## 7. Pause, win/fail, malfunctions (0.9.1)
+- [ ] Host opens Esc / alt-tabs mid-battle → the battle keeps running on both (no freeze on either side).
+- [ ] Mission is won/failed → both get the same result at the same time (guest log `MarkMissionComplete`/`Failed` from host).
+- [ ] Guest presses buttons a lot → never a dead/double press caused by the guest; host presses can still malfunction.
+
+## 8. Leaderboards
 - [ ] Finish a mission in co-op → log `Leaderboard: co-op session active` and `LeaderboardManager.OptOut (forced on…)`;
       no leaderboard submission.
 

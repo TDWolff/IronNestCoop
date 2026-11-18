@@ -38,6 +38,14 @@ static class LookAtTarget_EvaluateMalfunction
 {
     static bool Prefix(LookAtTarget __instance, ref LookAtTarget.MalfunctionType __result)
     {
+        // A guest's own press never rolls a malfunction (0.9.1): the host must not get a dead/double press decided by
+        // a guest. The press is sent as "None" and the host applies it that way.
+        if (Net.Role == Role.Guest && Net.Active && !Net.ApplyingRemote)
+        {
+            __instance.currentMalfunction = LookAtTarget.MalfunctionType.None;
+            __result = LookAtTarget.MalfunctionType.None;
+            return false;
+        }
         if (!Net.ApplyingRemote || Net.ForcedMalfunction is not { } forced) return true; // run original
         __instance.currentMalfunction = forced;
         __result = forced;

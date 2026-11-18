@@ -446,3 +446,15 @@ draggables (spawned at runtime — will need `MissionSaveIdentity` instead).
 - **0.9.0 checks 2–3 ✅ (FakePeer):** on join mid-mission the host captured and sent the checkpoint
   (`Snapshot: sent 'Hospital False Flag' to guest #1`, FakePeer saved a 41 KB JSON); firing broadcast
   `Combat: host fired gun 0`. Entity-state traffic not observed in tutorial 1 (no enemy state changes happened).
+
+## 0.9.1: pause, win/fail, malfunctions (2026-11-17)
+
+- **Pause recon:** `PauseManager` (static request counter `s_pauseRequestCount`, `RequestPause/ReleasePause`,
+  `RequestGlobalPause/ReleaseGlobalPause`, `TogglePause`, `OnApplicationFocus` with `PauseOnFocusLoss`), `TimePause`
+  (freezes time while enabled). `Authority.cs` skips all of them during a session (counting skipped requests so their
+  releases are skipped too; TimePause.OnDisable skipped for instances whose OnEnable was skipped).
+- `MarkMissionComplete/Failed(bool forceSetState)`: guests skip their own; host broadcasts MissionEvent 2/3 (+force).
+- Guest-originated `LookAtTarget` presses force `EvaluateMalfunction` → None; host presses roll normally (M3 forcing).
+- **0.9.1 pause check ✅ (hosting, localhost):** alt-tab → `OnApplicationFocus` skipped both ways (focus lost/regained),
+  Esc menu → `RequestPause` skipped; battle kept running; after leaving the session Esc paused normally (no NestCoop
+  lines). 48 Harmony patches, no errors. Win/fail and guest-malfunction changes need the two-player test.

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.1
+- **Co-op doesn't pause:** during a session, menus and alt-tab no longer freeze just your own game (that made the
+  players' battles drift apart). Outside a session the game pauses as usual.
+- **The host decides mission win/fail;** guests follow its verdict.
+- **Button malfunctions** are only rolled for the host's presses, so a guest can't make the host's button dead-press.
+
 ## 0.9.0
 - **Mission state from the host:** guests receive the host's full mission checkpoint (objectives, map, messages,
   punchcards, enemies) when they join mid-mission and periodically to correct drift, using the game's own

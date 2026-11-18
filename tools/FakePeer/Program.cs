@@ -24,7 +24,7 @@
 //   3 ControlValue: string id, float value                      (unreliable)
 //   4 ControlGrab:  string id, bool grabbed, float value
 //   6 MissionState: byte phase, string operationId, string missionId, int32 seed
-//   7 MissionEvent: byte kind (1 = FinishMission)
+//   7 MissionEvent: byte kind (1 FinishMission, 2 MarkMissionComplete, 3 MarkMissionFailed), [bool force]
 //  10 MissionCheckpoint: string op, string mission, int32 seed, int32 len, len bytes gzip(JSON)
 //  11 ResyncRequest:     (empty)
 //  12 ShellFired:        int32 gunIndex
@@ -41,7 +41,7 @@ string address = args.Length > 0 ? args[0] : "127.0.0.1";
 int port = args.Length > 1 ? int.Parse(args[1]) : 27960;
 // Key format (M9): "NestCoop|<mod version>|<game build>". FakePeer can't know the game build, so it connects with a
 // placeholder, gets REJECTED with the host's key (that exercises the version-mismatch path), then reconnects with it.
-string version = args.Length > 2 ? args[2] : "0.9.0";
+string version = args.Length > 2 ? args[2] : "0.9.1";
 string key = args.Length > 3 ? args[3] : $"NestCoop|{version}|fakepeer";
 bool retriedWithHostKey = false;
 
@@ -132,7 +132,7 @@ listener.NetworkReceiveEvent += (p, reader, ch, method) =>
             break;
         }
         case MissionEvent:
-            Console.WriteLine($"<- mission event {(r.ReadByte() == 1 ? "FinishMission" : "?")}");
+            { byte k = r.ReadByte(); string[] kinds = { "?", "FinishMission", "MarkMissionComplete", "MarkMissionFailed" }; Console.WriteLine($"<- mission event {(k < kinds.Length ? kinds[k] : k.ToString())}"); }
             break;
         case 10: // MissionCheckpoint
         {
