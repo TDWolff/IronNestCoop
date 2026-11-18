@@ -5,6 +5,12 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NestCoop", "NestCoop\NestCoop.csproj", "{7FA7B4DC-3DF5-4834-903F-4228462EB120}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tools", "tools", "{D88DEA07-739D-46E3-A998-4DD9322E3850}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FakePeer", "tools\FakePeer\FakePeer.csproj", "{DE0B3E7C-56FA-4339-AFF8-F873381CCA2E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AsmScan", "tools\AsmScan\AsmScan.csproj", "{F678536F-F917-40F0-89CE-8CAC492548E7}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -18,5 +24,17 @@ Global
 		{7FA7B4DC-3DF5-4834-903F-4228462EB120}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7FA7B4DC-3DF5-4834-903F-4228462EB120}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{7FA7B4DC-3DF5-4834-903F-4228462EB120}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DE0B3E7C-56FA-4339-AFF8-F873381CCA2E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DE0B3E7C-56FA-4339-AFF8-F873381CCA2E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DE0B3E7C-56FA-4339-AFF8-F873381CCA2E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DE0B3E7C-56FA-4339-AFF8-F873381CCA2E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F678536F-F917-40F0-89CE-8CAC492548E7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F678536F-F917-40F0-89CE-8CAC492548E7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F678536F-F917-40F0-89CE-8CAC492548E7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F678536F-F917-40F0-89CE-8CAC492548E7}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{DE0B3E7C-56FA-4339-AFF8-F873381CCA2E} = {D88DEA07-739D-46E3-A998-4DD9322E3850}
+		{F678536F-F917-40F0-89CE-8CAC492548E7} = {D88DEA07-739D-46E3-A998-4DD9322E3850}
 	EndGlobalSection
 EndGlobal

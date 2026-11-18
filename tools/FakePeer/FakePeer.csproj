@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Console stand-in for a second player. The game refuses to run twice on one PC (single-instance), so this
+       connects to the hosting game over LiteNetLib and speaks the NestCoop protocol. Same package as the mod. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="LiteNetLib" Version="2.1.5" />
+  </ItemGroup>
+</Project>

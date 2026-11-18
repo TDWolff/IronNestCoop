@@ -189,3 +189,13 @@ draggables (spawned at runtime — will need `MissionSaveIdentity` instead).
 4. Why `EndSliderDrag` fired once for five `BeginSliderDrag`s.
 2. Are the "Elevation Desired/Current" sliders player-draggable or just indicators?
 3. How the turret wheel's unlimited value maps to rotation (`TurretController.MapDialToTurretRotation`).
+
+## Milestone 3 notes (2026-11-17)
+
+- **The game is single-instance.** A second copy exits cleanly at startup (no crash event, empty MelonLoader log,
+  no `Player.log`), even with its own r2modman profile. Local multiplayer tests use `tools/FakePeer` (console
+  guest speaking the NestCoop protocol) instead.
+- Button sync verified both directions with FakePeer: game → guest (`sent press`), guest → game (`applied press`,
+  `EvaluateMalfunction [remote]` forced, lamp toggled).
+- Two `LookAtTarget`s can sit on one GameObject (`Barbet/Campaign 1/InMission Interaction blocker`) — IDs now add
+  `~n` for the 2nd+ component of the same type.

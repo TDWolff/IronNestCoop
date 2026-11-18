@@ -23,6 +23,9 @@
   <PropertyGroup>
     <GamePath Condition="'$(GamePath)' == ''">B:\SteamLibrary\steamapps\common\Iron Nest Heavy Turret Simulator</GamePath>
     <ProfilePath Condition="'$(ProfilePath)' == ''">$(APPDATA)\r2modmanPlus-local\IronNestHeavyTurretSimulator\profiles\Default</ProfilePath>
+    <!-- Second r2modman profile for the 2nd local instance (two instances can't share one profile's MelonLoader folder).
+         Deployed to only if it exists. -->
+    <GuestProfilePath Condition="'$(GuestProfilePath)' == ''">$(APPDATA)\r2modmanPlus-local\IronNestHeavyTurretSimulator\profiles\Guest</GuestProfilePath>
     <MLPath>$(ProfilePath)\MelonLoader</MLPath>
     <Il2CppAsm>$(MLPath)\Il2CppAssemblies</Il2CppAsm>
   </PropertyGroup>
@@ -39,6 +42,7 @@
 
     <Reference Include="Assembly-CSharp"><HintPath>$(Il2CppAsm)\Assembly-CSharp.dll</HintPath></Reference>
     <Reference Include="Il2Cppmscorlib"><HintPath>$(Il2CppAsm)\Il2Cppmscorlib.dll</HintPath></Reference>
+    <Reference Include="UnityEngine.IMGUIModule"><HintPath>$(Il2CppAsm)\UnityEngine.IMGUIModule.dll</HintPath></Reference>
     <Reference Include="UnityEngine.InputLegacyModule"><HintPath>$(Il2CppAsm)\UnityEngine.InputLegacyModule.dll</HintPath></Reference>
     <Reference Include="Unity.InputSystem"><HintPath>$(Il2CppAsm)\Unity.InputSystem.dll</HintPath></Reference>
     <Reference Include="UnityEngine.CoreModule"><HintPath>$(Il2CppAsm)\UnityEngine.CoreModule.dll</HintPath></Reference>
@@ -57,6 +61,14 @@
   <Target Name="DeployToProfile" AfterTargets="Build">
     <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ProfilePath)\Mods" SkipUnchangedFiles="false" />
     <Message Importance="high" Text="NestCoop -> $(ProfilePath)\Mods" />
+    <!-- Dependencies go in UserLibs/ (MelonLoader loads them before mods). -->
+    <Copy SourceFiles="$(PkgLiteNetLib)\lib\netstandard2.1\LiteNetLib.dll" DestinationFolder="$(ProfilePath)\UserLibs" SkipUnchangedFiles="true" />
+    <Message Importance="high" Text="LiteNetLib -> $(ProfilePath)\UserLibs" />
+
+    <!-- Guest profile (2nd local instance), only if it has been created in r2modman. -->
+    <Copy Condition="Exists('$(GuestProfilePath)\Mods')" SourceFiles="$(TargetPath)" DestinationFolder="$(GuestProfilePath)\Mods" SkipUnchangedFiles="false" ContinueOnError="true" />
+    <Copy Condition="Exists('$(GuestProfilePath)\UserLibs')" SourceFiles="$(PkgLiteNetLib)\lib\netstandard2.1\LiteNetLib.dll" DestinationFolder="$(GuestProfilePath)\UserLibs" SkipUnchangedFiles="true" ContinueOnError="true" />
+    <Message Condition="Exists('$(GuestProfilePath)\Mods')" Importance="high" Text="NestCoop -> $(GuestProfilePath)\Mods (guest profile)" />
   </Target>
 
 </Project>

@@ -26,13 +26,23 @@ static class LookAtTarget_OnClickDown
     {
         if (!Net.ApplyingRemote) DebugKeys.LastPressed = __instance;
         PatchLog.Hit("LookAtTarget.OnClickDown", $"{Ids.Of(__instance)} active={__instance.isActive} malfunction={__instance.currentMalfunction}");
+        Net.SendButtonPress(__instance); // no-op when offline or when this press came from the network
     }
 }
 
-/// Random dead/double press. Host must own this outcome later.
+/// Random dead/double press (returns LookAtTarget/MalfunctionType; called from inside OnClickDown).
+/// When applying a remote press, skip the local roll and use the sender's result so both sides match.
 [HarmonyPatch(typeof(LookAtTarget), nameof(LookAtTarget.EvaluateMalfunction))]
 static class LookAtTarget_EvaluateMalfunction
 {
+    static bool Prefix(LookAtTarget __instance, ref LookAtTarget.MalfunctionType __result)
+    {
+        if (!Net.ApplyingRemote || Net.ForcedMalfunction is not { } forced) return true; // run original
+        __instance.currentMalfunction = forced;
+        __result = forced;
+        return false; // skip the random roll
+    }
+
     static void Postfix(LookAtTarget __instance) =>
         PatchLog.Hit("LookAtTarget.EvaluateMalfunction", $"{Ids.Of(__instance)} -> {__instance.currentMalfunction}");
 }

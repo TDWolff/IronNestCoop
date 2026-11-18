@@ -4,69 +4,46 @@ using UnityEngine.InputSystem;
 namespace NestCoop;
 
 /// <summary>
-/// Debug hotkeys (only when DebugLog is on).
-///   ReplayKey (default Backslash, set in MelonPreferences.cfg) = replay the last button you pressed by calling LookAtTarget.OnClickDown() directly, flagged as remote.
-///        This is exactly what a guest/host will do with a received press, so it tests: does a direct call do a
-///        full press (animation + gameplay), and does echo suppression mark it [remote]?
-/// Default is NOT an F-key: on the dev keyboard F9 sends media Play/Pause (paused Spotify) unless Fn is held,
-/// so the game never received it. We read both the new Input System and legacy UnityEngine.Input, logging once
-/// which one works.
+/// Hotkeys. Key names are Unity Input System names, configurable in UserData/MelonPreferences.cfg [NestCoop].
+///   HostKey  (default Home)      start hosting on localhost
+///   JoinKey  (default End)       join JoinAddress:Port
+///   LeaveKey (default Delete)    disconnect
+///   ReplayKey (default Backslash, DebugLog only) replay your last button press as if it came from the network
+/// Defaults avoid the F-row: on the dev keyboard F-keys are media keys unless Fn is held (F9 paused Spotify).
 /// </summary>
 internal static class DebugKeys
 {
     public static LookAtTarget LastPressed;
 
-    static bool loggedNoKeyboard, loggedKeyboardOk, legacyBroken, loggedLegacyOk;
+    static bool loggedNoKeyboard, loggedKeyboardOk;
 
     public static void Update()
     {
-        if (!Mod.DebugLog.Value) return;
-        if (ReplayPressed()) ReplayLastPress();
+        if (Pressed(Mod.HostKey.Value)) Net.StartHost();
+        if (Pressed(Mod.JoinKey.Value)) Net.Join();
+        if (Pressed(Mod.LeaveKey.Value)) Net.Stop("leave key");
+        if (Mod.DebugLog.Value && Pressed(Mod.ReplayKey.Value)) ReplayLastPress();
     }
 
-    static bool ReplayPressed()
+    /// <summary>True on the frame the named key goes down (Input System; legacy Input proved unnecessary).</summary>
+    static bool Pressed(string keyName)
     {
-        bool pressed = false;
-        string keyName = Mod.ReplayKey.Value;
-
-        // New Input System
         try
         {
             var kb = Keyboard.current;
             if (kb == null)
             {
                 if (!loggedNoKeyboard) { loggedNoKeyboard = true; Mod.Log.Warning("DebugKeys: Keyboard.current is null"); }
+                return false;
             }
-            else
-            {
-                if (!loggedKeyboardOk && kb.anyKey.wasPressedThisFrame) { loggedKeyboardOk = true; Mod.Log.Msg("DebugKeys: new Input System sees key presses"); }
-                if (Enum.TryParse<Key>(keyName, true, out var key) && kb[key].wasPressedThisFrame)
-                { Mod.Log.Msg($"DebugKeys: {keyName} via Input System"); pressed = true; }
-            }
+            if (!loggedKeyboardOk && kb.anyKey.wasPressedThisFrame) { loggedKeyboardOk = true; Mod.Log.Msg("DebugKeys: keyboard input OK"); }
+            return Enum.TryParse<Key>(keyName, true, out var key) && kb[key].wasPressedThisFrame;
         }
         catch (Exception e)
         {
             if (!loggedNoKeyboard) { loggedNoKeyboard = true; Mod.Log.Warning($"DebugKeys: Input System read failed: {e.Message}"); }
+            return false;
         }
-
-        // Legacy input manager (may be disabled in this build — then it throws, and we stop trying)
-        if (!pressed && !legacyBroken)
-        {
-            try
-            {
-                if (Enum.TryParse<UnityEngine.KeyCode>(keyName, true, out var code) && UnityEngine.Input.GetKeyDown(code))
-                {
-                    if (!loggedLegacyOk) { loggedLegacyOk = true; Mod.Log.Msg($"DebugKeys: {keyName} via legacy Input"); }
-                    pressed = true;
-                }
-            }
-            catch (Exception e)
-            {
-                legacyBroken = true;
-                Mod.Log.Warning($"DebugKeys: legacy Input unavailable ({e.GetType().Name}); using Input System only");
-            }
-        }
-        return pressed;
     }
 
     static void ReplayLastPress()

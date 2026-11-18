@@ -1,3 +1,4 @@
+using Il2CppInterop.Runtime;
 using UnityEngine;
 
 namespace NestCoop;
@@ -8,11 +9,32 @@ namespace NestCoop;
 /// Raw sibling indices are NOT stable: Milestone 2 testing saw "Turret/Elevation Console" move from index 14 to 13
 /// during play. So we use names, and only when siblings share a name do we append "#n" = the n-th sibling with
 /// that name (n ≥ 1). Recon: only the table lamp's two "Universal Button"s and runtime map tokens collide.
+/// If one GameObject has several components of the same type (seen: two LookAtTargets on
+/// "Barbet/Campaign 1/InMission Interaction blocker"), the 2nd+ get "~n" (component order is fixed by the prefab).
 /// Never use GetInstanceID() — it differs per machine.
 /// </summary>
 internal static class Ids
 {
-    public static string Of(Component c) => c == null ? "<null>" : $"{c.gameObject.scene.name}:{NamePath(c.transform)}";
+    public static string Of(Component c)
+    {
+        if (c == null) return "<null>";
+        string id = $"{c.gameObject.scene.name}:{NamePath(c.transform)}";
+        int n = SameTypeIndex(c);
+        return n == 0 ? id : $"{id}~{n}";
+    }
+
+    /// Index of c among components of exactly its type on its GameObject (0 for the first/only one).
+    static int SameTypeIndex(Component c)
+    {
+        var type = c.GetIl2CppType();
+        int n = 0;
+        foreach (var other in c.GetComponents(type))
+        {
+            if (other == c) return n;
+            n++;
+        }
+        return 0;
+    }
 
     public static string NamePath(Transform t)
     {
@@ -65,11 +87,4 @@ internal static class PatchLog
         if (first) Mod.Log.Msg($"FIRST HIT {patch}{origin} {detail}");
         else if (detail != null) Mod.Log.Msg($"{patch}{origin} {detail}");
     }
-}
-
-/// <summary>Placeholder until Milestone 3 adds a transport. Holds the echo-suppression flag.</summary>
-internal static class Net
-{
-    /// <summary>True while we apply a change that came from the network, so patches don't re-send it.</summary>
-    public static bool ApplyingRemote;
 }
