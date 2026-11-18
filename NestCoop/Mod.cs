@@ -9,12 +9,12 @@ namespace NestCoop;
 public class Mod : MelonMod
 {
     /// <summary>Also part of the network connection key: different versions refuse to connect.</summary>
-    public const string Version = "0.9.2";
+    public const string Version = "0.9.3";
 
     internal static MelonLogger.Instance Log;
     internal static MelonPreferences_Entry<bool> DebugLog;
     internal static MelonPreferences_Entry<bool> ReconOnSceneLoad, ProbeTurret, TerminalEnabled;
-    internal static MelonPreferences_Entry<string> ReplayKey, MissionReplayKey, HostKey, JoinKey, LeaveKey, JoinAddress, TransportName, SteamJoinTarget, SteamCheckKey, MenuKey, UiDumpKey, MenuStyle, CheckpointTestKey;
+    internal static MelonPreferences_Entry<string> ReplayKey, MissionReplayKey, HostKey, JoinKey, LeaveKey, JoinAddress, TransportName, SteamJoinTarget, SteamCheckKey, MenuKey, UiDumpKey, MenuStyle, CheckpointTestKey, PlayerName;
     internal static MelonPreferences_Entry<int> Port, SyncHz, TurretHz, PoseHz, MaxPlayers, ResyncMinutes;
     internal static MelonPreferences_Entry<float> TurretSnapDegrees, AvatarTimeout;
 
@@ -26,6 +26,7 @@ public class Mod : MelonMod
         ReconOnSceneLoad = cat.CreateEntry("ReconOnSceneLoad", false, description: "Write UserData/NestCoop/recon/<scene>.txt listing controls and what they drive.");
         ProbeTurret = cat.CreateEntry("ProbeTurret", false, description: "Debug: log traverse wheel + turret internals while the wheel is dragged.");
         ReplayKey = cat.CreateEntry("ReplayKey", "Backslash", description: "Debug: replays your last button press as if it came from the network. Unity key name, e.g. Backslash, Insert, F9.");
+        PlayerName = cat.CreateEntry("PlayerName", "", description: "Name shown above your avatar for other players. Empty = your Steam name.");
         CheckpointTestKey = cat.CreateEntry("CheckpointTestKey", "RightBracket", description: "Debug: capture the current mission and reload it through the guest checkpoint path (local test). Needs DebugLog.");
         MissionReplayKey = cat.CreateEntry("MissionReplayKey", "Insert", description: "Debug: re-apply the last started mission through the guest code path (local test of mission sync).");
         HostKey = cat.CreateEntry("HostKey", "Home", description: "Start hosting a co-op session.");

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.3
+- **Name tags** above every player's avatar (your Steam name, or set `PlayerName`), in the game's own font and
+  the player's colour, always facing you. The co-op menu lists players by name.
+
 ## 0.9.2
 - A guest who picks **Return to Main Menu / Return to Map** in the Esc menu now leaves the co-op session and goes
   back as normal (before, they were stuck with "Only the host can change missions").

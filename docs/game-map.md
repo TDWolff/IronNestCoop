@@ -460,3 +460,8 @@ draggables (spawned at runtime — will need `MissionSaveIdentity` instead).
   lines). 48 Harmony patches, no errors. Win/fail and guest-malfunction changes need the two-player test.
 - **0.9.2:** guest-initiated `ReturnToMap` / `EndOperationAndReturnToMenu` (Esc menu) now leave the session first
   (`MissionGate.AllowOrLeave`) and then run normally; other guest mission changes are still blocked.
+- **0.9.3 name tags:** `PlayerInfo` (msg 16: id, name; guest sends id -1 on connect, host stamps the peer id, relays,
+  and sends a newcomer all names incl. its own as id 0). Name = `PlayerName` setting → Steam persona name → "Player".
+  Tag = `Text3D.Create` (clone of the clipboard's 3D TextMeshPro, rich text off), 2.1 m up (1.6 crouched), turned to
+  `Camera.main` each frame. Names survive avatar timeouts; forgotten on leave.
+- **0.9.3 check ✅:** host received `player 1 is 'FakePeer'` before the avatar existed; avatar created with its tag (no template warning); removed on leave.

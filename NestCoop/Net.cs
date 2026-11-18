@@ -19,6 +19,7 @@ internal enum MsgType : byte
     EntityState = 13,       // string entityId, int state, int health, int armour                  (host → guests)
     TurretMove = 14,        // 3×float worldPos, bool dodge          (guest → host request; host → guests)
     ValveDamage = 15,       // string valveId, float damage01                                      (host → guests)
+    PlayerInfo = 16,        // int playerId, string displayName   (guest → host; host → guests)
     PlayerLeft = 9,    // int playerId                                         (host → guests)
     PlayerPose = 8,    // int playerId, 3×float feet, 4×float head rotation, bool crouched (unreliable; host relays)
     TurretState = 5,   // float angle, float desired, float velocity, int n, n×float gunElevation (host → guests)
@@ -55,7 +56,7 @@ internal static class Net
     /// <summary>Connected peers with display names (for the menu). Guests see just the host.</summary>
     public static IEnumerable<(int id, string name)> Peers => transport == null
         ? Enumerable.Empty<(int, string)>()
-        : peers.Select(id => (id, transport.DescribePeer(id))).ToList();
+        : peers.Select(id => (id, Role == Role.Host ? $"{Avatars.NameOf(id)} — {transport.DescribePeer(id)}" : $"{Avatars.NameOf(0)} (host)")).ToList();
 
     /// <summary>Overlay text; null when offline.</summary>
     public static string StatusLine => Role switch
@@ -136,8 +137,8 @@ internal static class Net
         t.PeerConnected += id =>
         {
             peers.Add(id);
-            if (Role == Role.Guest) { hostPeer = id; Say("Connected to host"); }
-            else { Say($"Guest #{id} joined"); Combat.OnGuestJoined(); MissionSync.SendSnapshot(id); SendSnapshot(id); ControlSync.SendSnapshot(id); }
+            if (Role == Role.Guest) { hostPeer = id; Say("Connected to host"); Avatars.SendMyName(); }
+            else { Say($"Guest #{id} joined"); Combat.OnGuestJoined(); Avatars.SendNamesTo(id); MissionSync.SendSnapshot(id); SendSnapshot(id); ControlSync.SendSnapshot(id); }
         };
         t.PeerDisconnected += (id, reason) =>
         {
@@ -293,6 +294,9 @@ internal static class Net
                 case MsgType.TurretMove:
                 case MsgType.ValveDamage:
                     Combat.Handle(type, from, r);
+                    break;
+                case MsgType.PlayerInfo:
+                    Avatars.HandleInfo(from, r);
                     break;
                 case MsgType.PlayerLeft:
                 {

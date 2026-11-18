@@ -1,12 +1,12 @@
-# Two-player Steam test plan (NestCoop 0.9.2)
+# Two-player Steam test plan (NestCoop 0.9.3)
 
 Everything below can only be checked with **two PCs and two Steam accounts that both own IRON NEST** (the game won't
 run twice on one PC, and Steam can't connect you to yourself). Tick items off as you go; after the session, send the
 `MelonLoader/Latest.log` from **both** profiles.
 
 ## Setup (both players)
-- [ ] Same game build (log line `NestCoop 0.9.2 loaded (key NestCoop|0.9.2|<game build>)` must show the same key).
-- [ ] Import `TDWolff-NestCoop-0.9.2.zip` in r2modman (Settings → Import local mod) into a **fresh** profile.
+- [ ] Same game build (log line `NestCoop 0.9.3 loaded (key NestCoop|0.9.3|<game build>)` must show the same key).
+- [ ] Import `TDWolff-NestCoop-0.9.3.zip` in r2modman (Settings → Import local mod) into a **fresh** profile.
 - [ ] Launch once, quit, set in `UserData/MelonPreferences.cfg` under `[NestCoop]`:
       `Transport = "Steam"` and `DebugLog = true` (for the test logs).
 - [ ] Be Steam friends; both in the game's main menu.
@@ -46,6 +46,7 @@ run twice on one PC, and Steam can't connect you to yourself). Tick items off as
 
 ## 6. Players
 - [ ] Each sees the other's avatar (orange host, blue guest), walking, looking, crouching.
+- [ ] Each sees the other's **Steam name** above their avatar, readable from any side; the co-op menu lists names.
 - [ ] Guest quits the game → host sees "Guest #1 left the session", avatar gone immediately.
 - [ ] Guest uses Esc → Return to Main Menu mid-mission → "You left the co-op session", guest goes to the menu; host sees the guest leave.
 - [ ] Host quits → guest sees "Host left the session"; guest's game stays usable.

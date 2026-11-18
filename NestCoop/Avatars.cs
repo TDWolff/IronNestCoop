@@ -25,6 +25,8 @@ internal static class Avatars
     sealed class Avatar
     {
         public GameObject Root, Body, Head;
+        public Il2CppTMPro.TextMeshPro Label;
+        public Color Color;
         public Vector3 TargetFeet;
         public Quaternion TargetHead = Quaternion.identity;
         public bool Crouched;
@@ -113,7 +115,8 @@ internal static class Avatars
             // Visor: a dark slab on the front of the head, so you can see where they're looking.
             Part(PrimitiveType.Cube, head.transform, new Vector3(0, 0.05f, 0.42f), new Vector3(0.8f, 0.3f, 0.3f), Color.black);
 
-            a = new Avatar { Root = root, Body = body, Head = head };
+            a = new Avatar { Root = root, Body = body, Head = head, Color = color };
+            ApplyName(a, id);
             avatars[id] = a;
             Mod.Log.Msg($"Avatars: created avatar for player {id}");
             Overlay.Toast($"Player {id} avatar spawned");
@@ -173,6 +176,7 @@ internal static class Avatars
     {
         if (avatars.Count == 0) return;
         float t = 1f - Mathf.Exp(-12f * Time.unscaledDeltaTime);
+        var cam = Camera.main;
         List<int> stale = null;
         foreach (var (id, a) in avatars)
         {
@@ -180,6 +184,13 @@ internal static class Avatars
             var tr = a.Root.transform;
             tr.position = Vector3.Lerp(tr.position, a.TargetFeet, t);
             ApplyHead(a, t);
+            if (a.Label != null && cam != null)
+            {
+                // Name tag: above the head, always facing this player's camera (TMP reads from -Z).
+                var lt = a.Label.transform;
+                lt.localPosition = new Vector3(0, a.Crouched ? 1.6f : 2.1f, 0);
+                lt.rotation = Quaternion.LookRotation(lt.position - cam.transform.position);
+            }
             float bodyY = a.Crouched ? 0.6f : 0.9f;
             a.Body.transform.localScale = new Vector3(0.5f, bodyY, 0.5f);
             a.Body.transform.localPosition = new Vector3(0, bodyY, 0);
@@ -196,6 +207,67 @@ internal static class Avatars
         a.Head.transform.localPosition = new Vector3(0, a.Crouched ? 1.15f : 1.65f, 0);
     }
 
+    // ---------------- Names ----------------
+    // Each player's display name: the PlayerName setting, else their Steam name, else "Player". A guest sends its own
+    // name to the host on connect (PlayerInfo, id -1); the host stamps the peer id, relays it to the other guests and
+    // sends the newcomer every known name including its own (id 0). Shown as a tag above the avatar.
+
+    static readonly Dictionary<int, string> names = new();
+
+    public static string MyName
+    {
+        get
+        {
+            string n = Mod.PlayerName.Value?.Trim();
+            if (string.IsNullOrEmpty(n) && Transport.SteamApi.Init(out _)) n = Transport.SteamApi.MyName;
+            if (string.IsNullOrEmpty(n)) n = "Player";
+            return n.Length > 24 ? n[..24] : n;
+        }
+    }
+
+    static byte[] WriteInfo(int id, string name) => Net.Write(MsgType.PlayerInfo, w => { w.Write(id); w.Write(name); });
+
+    /// <summary>Guest: just connected to the host — introduce ourselves.</summary>
+    public static void SendMyName() => Net.SendToSession(WriteInfo(-1, MyName), reliable: true);
+
+    /// <summary>Host: a guest joined — send them our name and everyone else's.</summary>
+    public static void SendNamesTo(int peer)
+    {
+        Net.SendTo(peer, WriteInfo(HostPlayerId, MyName), reliable: true);
+        foreach (var (id, n) in names)
+            if (id != peer) Net.SendTo(peer, WriteInfo(id, n), reliable: true);
+    }
+
+    public static void HandleInfo(int from, BinaryReader r)
+    {
+        int id = r.ReadInt32();
+        string name = r.ReadString();
+        if (name.Length > 24) name = name[..24];
+        if (Net.Role == Role.Host)
+        {
+            id = from; // trust the transport, not the message
+            Net.Broadcast(WriteInfo(id, name), reliable: true, exceptPeer: from);
+        }
+        names[id] = name;
+        Mod.Log.Msg($"Avatars: player {id} is '{name}'");
+        if (avatars.TryGetValue(id, out var a)) ApplyName(a, id);
+    }
+
+    /// <summary>Name for a player id (for the menu); falls back to "Player n".</summary>
+    public static string NameOf(int id) => names.TryGetValue(id, out var n) ? n : $"Player {id}";
+
+    static void ApplyName(Avatar a, int id)
+    {
+        if (a.Root == null) return;
+        string text = NameOf(id);
+        if (a.Label == null)
+        {
+            a.Label = Text3D.Create(a.Root.transform, text, 0.03f, Color.Lerp(a.Color, Color.white, 0.35f));
+            if (a.Label == null) Mod.Log.Warning("Avatars: name tag template not found; no name tags");
+        }
+        else a.Label.text = text;
+    }
+
     // ---------------- Cleanup ----------------
 
     public static void OnPeerLeft(int peer)
@@ -206,6 +278,7 @@ internal static class Avatars
 
     public static void Reset()
     {
+        names.Clear();
         foreach (var id in avatars.Keys.ToList()) Remove(id, "session ended");
     }
 
@@ -213,6 +286,7 @@ internal static class Avatars
 
     static void Remove(int id, string why)
     {
+        if (why != "timed out") names.Remove(id); // a timed-out avatar comes back with the same name
         if (!avatars.Remove(id, out var a)) return;
         if (a.Root != null) UnityEngine.Object.Destroy(a.Root);
         Mod.Log.Msg($"Avatars: removed player {id} ({why})");

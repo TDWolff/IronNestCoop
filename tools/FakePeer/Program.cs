@@ -31,6 +31,7 @@
 //  13 EntityState:       string id, int32 state, int32 health, int32 armour
 //  14 TurretMove:        3 x float worldPos, bool dodge
 //  15 ValveDamage:       string valveId, float damage01
+//  16 PlayerInfo:        int32 playerId, string name   (FakePeer sends its own name on connect)
 //   9 PlayerLeft:   int32 playerId
 //   8 PlayerPose:   int32 playerId, 3 x float feet, 4 x float head rotation (x,y,z,w), bool crouched (unreliable)
 //   5 TurretState:  float angle, float desired, float velocity, int32 n, n x float gunElevation (unreliable)
@@ -41,9 +42,10 @@ string address = args.Length > 0 ? args[0] : "127.0.0.1";
 int port = args.Length > 1 ? int.Parse(args[1]) : 27960;
 // Key format (M9): "NestCoop|<mod version>|<game build>". FakePeer can't know the game build, so it connects with a
 // placeholder, gets REJECTED with the host's key (that exercises the version-mismatch path), then reconnects with it.
-string version = args.Length > 2 ? args[2] : "0.9.2";
+string version = args.Length > 2 ? args[2] : "0.9.3";
 string key = args.Length > 3 ? args[3] : $"NestCoop|{version}|fakepeer";
 bool retriedWithHostKey = false;
+string myName = args.Length > 4 ? args[4] : "FakePeer";
 
 const byte ButtonPress = 1, ReloadState = 2, ControlValue = 3, ControlGrab = 4, TurretState = 5, MissionState = 6, MissionEvent = 7, PlayerPose = 8;
 float hx = 0, hy = 0, hz = 0, hostYaw = 0, hostYawAtStart = 0; bool haveHostPose = false;
@@ -67,7 +69,7 @@ NetPeer host = null;
 var listener = new EventBasedNetListener();
 var manager = new NetManager(listener) { AutoRecycle = true, DisconnectTimeout = 10000 };
 
-listener.PeerConnectedEvent += p => { host = p; Console.WriteLine("[connected to host] commands: list | again | send <n> | press <id> | reload <n> <i> | controls | drag <n> <delta> [s] | turret | mission <p> | walk [r] | stand | still | resync | quit"); };
+listener.PeerConnectedEvent += p => { host = p; SendName(); Console.WriteLine("[connected to host] commands: list | again | send <n> | press <id> | reload <n> <i> | controls | drag <n> <delta> [s] | turret | mission <p> | walk [r] | stand | still | resync | quit"); };
 listener.PeerDisconnectedEvent += (p, info) =>
 {
     host = null;
@@ -155,6 +157,7 @@ listener.NetworkReceiveEvent += (p, reader, ch, method) =>
         }
         case 14: Console.WriteLine($"<- turret move to ({r.ReadSingle():0.#}, {r.ReadSingle():0.#}, {r.ReadSingle():0.#}) dodge={r.ReadBoolean()}"); break;
         case 15: { string id = r.ReadString(); float d = r.ReadSingle(); if (d > 0.001f) Console.WriteLine($"<- valve {Short(id)} damage {d:0.00}"); break; }
+        case 16: { int pid = r.ReadInt32(); Console.WriteLine($"<- player {pid} is '{r.ReadString()}'"); break; }
         case 9: // PlayerLeft
             Console.WriteLine($"<- player {r.ReadInt32()} left");
             break;
@@ -318,6 +321,14 @@ void SendGrab(string id, bool grabbed, float v)
     using var ms = new MemoryStream();
     using (var w = new BinaryWriter(ms)) { w.Write(ControlGrab); w.Write(id); w.Write(grabbed); w.Write(v); }
     host.Send(ms.ToArray(), DeliveryMethod.ReliableOrdered);
+}
+
+void SendName()
+{
+    using var ms = new MemoryStream();
+    using (var w = new BinaryWriter(ms)) { w.Write((byte)16); w.Write(-1); w.Write(myName); }
+    host?.Send(ms.ToArray(), DeliveryMethod.ReliableOrdered);
+    Console.WriteLine($"-> my name is '{myName}'");
 }
 
 static string Short(string id) => id.Length <= 90 ? id : "…" + id[^89..];
