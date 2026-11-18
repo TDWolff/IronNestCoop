@@ -1,0 +1,62 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>NestCoop</AssemblyName>
+    <RootNamespace>NestCoop</RootNamespace>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <!-- net6 is out of support; MelonLoader's IL2CPP runtime still targets it. -->
+    <CheckEolTargetFramework>false</CheckEolTargetFramework>
+  </PropertyGroup>
+
+  <!--
+    Paths. Override per machine without editing this file:
+      dotnet build -p:ProfilePath="..."   or set them in Directory.Build.props.user (gitignored).
+    GamePath    = the Steam install (GameAssembly.dll, global-metadata.dat).
+    ProfilePath = the r2modman profile. MelonLoader, Mods/ and Il2CppAssemblies/ live here, NOT in GamePath.
+  -->
+  <Import Project="..\Directory.Build.props.user" Condition="Exists('..\Directory.Build.props.user')" />
+  <PropertyGroup>
+    <GamePath Condition="'$(GamePath)' == ''">B:\SteamLibrary\steamapps\common\Iron Nest Heavy Turret Simulator</GamePath>
+    <ProfilePath Condition="'$(ProfilePath)' == ''">$(APPDATA)\r2modmanPlus-local\IronNestHeavyTurretSimulator\profiles\Default</ProfilePath>
+    <MLPath>$(ProfilePath)\MelonLoader</MLPath>
+    <Il2CppAsm>$(MLPath)\Il2CppAssemblies</Il2CppAsm>
+  </PropertyGroup>
+
+  <ItemDefinitionGroup>
+    <Reference><Private>false</Private></Reference>
+  </ItemDefinitionGroup>
+
+  <ItemGroup>
+    <Reference Include="MelonLoader"><HintPath>$(MLPath)\net6\MelonLoader.dll</HintPath></Reference>
+    <Reference Include="0Harmony"><HintPath>$(MLPath)\net6\0Harmony.dll</HintPath></Reference>
+    <Reference Include="Il2CppInterop.Runtime"><HintPath>$(MLPath)\net6\Il2CppInterop.Runtime.dll</HintPath></Reference>
+    <Reference Include="Il2CppInterop.Common"><HintPath>$(MLPath)\net6\Il2CppInterop.Common.dll</HintPath></Reference>
+
+    <Reference Include="Assembly-CSharp"><HintPath>$(Il2CppAsm)\Assembly-CSharp.dll</HintPath></Reference>
+    <Reference Include="Il2Cppmscorlib"><HintPath>$(Il2CppAsm)\Il2Cppmscorlib.dll</HintPath></Reference>
+    <Reference Include="UnityEngine.InputLegacyModule"><HintPath>$(Il2CppAsm)\UnityEngine.InputLegacyModule.dll</HintPath></Reference>
+    <Reference Include="Unity.InputSystem"><HintPath>$(Il2CppAsm)\Unity.InputSystem.dll</HintPath></Reference>
+    <Reference Include="UnityEngine.CoreModule"><HintPath>$(Il2CppAsm)\UnityEngine.CoreModule.dll</HintPath></Reference>
+  </ItemGroup>
+
+  <!-- Milestone 3 transport (localhost testing). Deployed to the profile's UserLibs/ by DeployToProfile. -->
+  <ItemGroup>
+    <PackageReference Include="LiteNetLib" Version="2.1.5" GeneratePathProperty="true" />
+  </ItemGroup>
+
+  <Target Name="CheckPaths" BeforeTargets="ResolveAssemblyReferences">
+    <Error Condition="!Exists('$(MLPath)\net6\MelonLoader.dll')" Text="MelonLoader not found under ProfilePath='$(ProfilePath)'. Install LavaGang-MelonLoader in r2modman and launch modded once." />
+    <Error Condition="!Exists('$(Il2CppAsm)\Assembly-CSharp.dll')" Text="Il2CppAssemblies missing under '$(Il2CppAsm)'. Launch the game modded once to generate them." />
+  </Target>
+
+  <Target Name="DeployToProfile" AfterTargets="Build">
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ProfilePath)\Mods" SkipUnchangedFiles="false" />
+    <Message Importance="high" Text="NestCoop -> $(ProfilePath)\Mods" />
+  </Target>
+
+</Project>

@@ -1,0 +1,191 @@
+# Game map — IRON NEST: Heavy Turret Simulator
+
+Recon notes for NestCoop. **Source:** static scan of the Il2CppInterop proxy `Assembly-CSharp.dll`
+(`tools/AsmScan`, full dump in `dump/Assembly-CSharp.txt`, gitignored).
+
+- Game build: Steam build **26352746**, Unity **6000.3.21f1**, IL2CPP, MelonLoader **0.7.3**.
+- All game types below are in the `Il2Cpp` namespace in C# (e.g. `Il2Cpp.TurretController`).
+- **Status legend:** ✅ exists in the dump. 🔍 needs UnityExplorer to confirm *which objects use it / how it's wired*.
+  Nothing here has been hooked with Harmony yet — every patch still needs its first-hit log line.
+
+Regenerate the dump after a game update:
+```bash
+tools/AsmScan/bin/out/AsmScan.exe "%APPDATA%/r2modmanPlus-local/IronNestHeavyTurretSimulator/profiles/Default/MelonLoader/Il2CppAssemblies/Assembly-CSharp.dll" dump/Assembly-CSharp.txt
+```
+
+## Big picture
+
+The controls are **composition-based**, not one class per lever. A physical control is a GameObject with a
+generic input component (dial / slider / click) whose UnityEvent drives a "system" controller:
+
+```
+DialInteractable ──OnValueChanged──▶ TurretController / GunController / ValveController / ...
+LinearSliderInteractable ──OnValueChanged──▶ GunElevationSliderBinding / ...
+ClickEvent (OnPointerClick) / Interactable ──▶ ArtilleryReloadController / PowderChargeController / ArtilleryComputer ...
+```
+
+So instead of patching dozens of lever types, we can sync **three generic input components** plus a few system
+controllers. That's the plan for Milestone 3–4.
+
+Almost every system also has **`CaptureMissionState()` / `RestoreMissionState(saveData)`** (the game's checkpoint
+system, driven by `MissionSaveManager`). That's a ready-made full-state snapshot for late-join / resync.
+
+## Input components (the things players touch)
+
+| Class | Kind | Key members | Sync notes |
+|---|---|---|---|
+| `DialInteractable` ✅ | rotary wheel/knob/dial | `SetDialValue(value)`, `SetAccumulatedValueUnlimited(angleDegrees, fireValueChangedEvent, smoothToTarget)`, `BeginDialDrag()`, `EndDialDrag()`, `Update()`; props `AccumulatedValue`, `IsDragging`, `currentRotationAngle`; events `OnValueChanged`, `OnGrab`, `OnRelease`, `OnBeginDialDrag`, `OnEndDialDrag` | Continuous. Drag logic is in `Update()` (not patchable per-change) → poll `AccumulatedValue` while `IsDragging`, apply remotely via `SetAccumulatedValueUnlimited`. |
+| `LinearSliderInteractable` ✅ | linear lever/slider | `SetSliderValue(value)`, `BeginSliderDrag()`, `EndSliderDrag()`; props `Value`, `IsDragging`; events `OnValueChanged`, `OnBeginSliderDrag`, `OnEndSliderDrag` | Same pattern as dials. |
+| `Interactable` ✅ | marker/prompt/cursor for anything clickable | `SetInteractable(value)`, `IsInteractable`, `IsPassive`, `GetResolvedPrompt()` | Not the click handler itself. |
+| `ClickEvent` ✅🔍 | click → UnityEvent | `OnPointerClick(eventData)`, `m_OnClick` | Likely the physical push-buttons. Confirm in UnityExplorer. Candidate for the first synced "lever". |
+| `SystemDependantClick` ✅🔍 | keyboard/gamepad click variant | `SystemDependantClickCheck()` | |
+| `InteractableGroupTrigger` ✅ | fires when children interacted | `HandleInteractableEvent(target)` | |
+| `DynamicCursorManager` ✅ | hover/raycast/grab dispatch for all of the above | `BeginDrag(draggable)`, `HandleGrabInput()`, `PerformHoverDetection()` | Central place if we need "who is grabbing what". |
+| `InteractionLockBroker` ✅ | exclusive locks while dragging | `Acquire(request)`, `Release(handle)` | Might be reused for "one player per control". |
+
+## Turret & guns
+
+| Class | Members of interest |
+|---|---|
+| `TurretController` ✅ | `OnBeginRotationDialDrag()`, `OnEndRotationDialDrag()`, `OnBeginElevationDialDrag()`, `OnEndElevationDialDrag()`, `MapDialToTurretRotation(dialDegrees)`, `UpdateDesiredRotationTargetDynamics()`, `UpdateRotationPhysics()`, `BackdriveRotationDial()`, `FireControlledGun()`, `FireGunByIndex(gunIndex)`, `SetPowderChargeForAllGuns(chargeLevel)`, `MoveTurret(worldPos, dodgeCounterBattery)`, `ResetTurretRotation()`, `CaptureMissionState()`, `RestoreMissionState(saveData)`. Nested value providers: `FloatValueProvider_DesiredRotation`, `_CurrentAngle`, `_DesiredElevation`, `_CurrentElevation`, `_PowderCharge`. |
+| `GunController` ✅ | `SetDesiredElevation(elevationAngle)`, `SetDesiredElevationFromDial(...)`, `SetDesiredElevationFromSlider(...)`, `SetPowderCharge(chargeLevel)`, `RequestFire()`, `FireShell()`, `FireShellDelayed()`, `OnShellLoaded()`, `OnShellUnloaded()`, `CaptureMissionState()`/`RestoreMissionState`. Enum `GunController/CommandSource`. |
+| `GunElevationDialBinding`, `GunElevationSliderBinding`, `GunElevationLinkCoordinator` ✅ | Glue between elevation inputs and guns. |
+
+**Rotation plan (host-authoritative target):** "desired rotation" is a separate concept from current angle
+(`UpdateDesiredRotationTargetDynamics`, `FloatValueProvider_DesiredRotation`) — that's the value to make host-owned.
+`OnBegin/EndRotationDialDrag` tell us when a guest is actively turning.
+
+## Ammo / reload
+
+| Class | Members of interest |
+|---|---|
+| `ArtilleryReloadController` ✅ | State machine: `AdvanceState()`, `RegressState()`, `SetState(newIndex, force, triggerAnimations)`, `GoToState(stateKey)`, `OnUserInput_Advance()`, `OnUserInput_Regress()`, `TryLoadShell()`, `EjectChamberedShell()`; props `CurrentStateIndex`, state keys `BreechOpenStateKey`, `ShellRammingStateKey`, `SelectPowderChargeStateKey`, `RamChargesStateKey`; event `OnStateChanged`. Note `OnAnimationEvent_AdvanceState()` — some transitions come from animations. |
+| `PowderChargeController` ✅ | `OnChargeButtonPressed(index)`, `OnLoadChargesPressed()`, `BeginChargeSelection()`, `EndChargeSelection()` |
+| `CylinderShellSelector`, `ShellSlotPool`, `ShellLoadoutApplier`, `AutoReloadManager` ✅ | Shell selection / magazine. |
+
+`OnUserInput_*` and `OnChargeButtonPressed(index)` are good discrete-event hooks (reliable messages).
+
+## Artillery computer
+
+`ArtilleryComputer` ✅: `OnRangeInputChanged(value)`, `OnPowderChargeChanged(value)`, `OnCalculateButtonPressed()`,
+events `CalculationSuccessEvent` / `CalculationErrorEvent`. Inputs are probably dials feeding `OnRangeInputChanged` 🔍.
+
+## Pressure / valves (damage system)
+
+`ValveController` ✅ (`HandleDialValueChanged`, `DamageValve()`, `ForceFixValve()`, `SetDamage01(damage01)`),
+`HighPressureSystemManager` ✅. `DialInteractable` ranges get clamped by system health.
+
+## Missions
+
+| Class | Members of interest |
+|---|---|
+| `MissionManager` ✅ | `StartOperation(operation, mission[, checkpoint])`, `ResumeOperation`, `LoadMission(mission, forceReload, checkpoint)`, `StartMissionRuntime(checkpoint)`, `FinishMission()`, `MarkMissionComplete`, `MarkMissionFailed`, `ReloadCurrentMission()`, `ReturnToMap()`, `EndOperationAndReturnToMenu()`, `LoadMainMenu()`, `SetPhase(next)` |
+| `FireMission` ✅ | Spawns/moves enemies (`CreateMapEntity`, `MoveMapEntity`, `SetEntityState`), `GenerateMission()`, `SampleAreaPosition(zone, rng)`, `RandomPointWorldInside(zone, rng)` — **RNG is passed in**, so seed sync is plausible. `Get/SetMissionVariable(key, value)`. |
+| `MissionSaveManager` ✅ | Checkpoint capture/restore of the whole mission incl. node graphs (`CaptureGraphs`, `RestoreGraphs`), map tokens, punchcards, transforms. Also `GetHierarchyPath(transform)` — the game already has a path-ID scheme. |
+| `Il2CppSleepyNodes.*` ✅ | Node-graph scripting for missions: `MissionGraph`, `OperationGraph`, `ObjectiveGraph`, `PunchcardGraph`, `StateGraph`. Guests should probably *not* run these; host runs them. |
+
+Scenes seen: `[0] Master Turret Scene` (boot), `[1] Main Menu`. Mission scenes are loaded additively by `MissionManager` 🔍.
+
+## Player / camera
+
+`FirstPersonController` ✅ (`HandleMovement()`, `HandleCamera()`, `SetPitch(pitch)`, `SetFrozen(frozen)`),
+`PlayerSpawnPoint`, `CameraFollower`, `FreeCameraController`, `RTSMapCameraController` (map view).
+
+## Leaderboard (Milestone 9: disable while modded)
+
+`LeaderboardManager` ✅ (`Leaderboard_StartRun(gamemode)`, `Leaderboard_CompleteRun(onCompleted)`, `RecordAction`,
+`RetryPendingSubmissions()`), `SteamLeaderboardScoreController` ✅ (`SubmitScore()`, `SubmitScoreInternal(forceUpdate)`),
+`LeaderboardClient`, `PostLeaderboardScoreRequest`.
+
+## Networking available in-game
+
+`Il2Cppcom.rlabrecque.steamworks.net.dll` (Steamworks.NET) and `Il2CppHeathen.Steamworks.dll` are shipped and proxied.
+
+## Live recon findings (in-game, 2026-11-17)
+
+From `NestCoop/Recon.cs` output (`UserData/NestCoop/recon/<scene>.txt`), tutorial mission 1.
+
+- **The whole turret lives in `Master Turret Scene`** (build index 0, loaded at boot and kept). Missions such as
+  `Mission tutorial 1` (index 4) load *additively* and contain mission-only objects (tarps, newspapers, win trigger).
+  So stable IDs for controls = paths inside `Master Turret Scene`; mission objects need the scene name as a prefix.
+- **No duplicate hierarchy paths** among 551 components (path + sibling index). Note the right gun reuses the left's
+  child name `PressureSystem_ChargeRammerLeft[20]`, but the root `Gun System Right[0]` keeps it unique.
+- Inspector-wired `UnityEvent`s on dials/sliders only drive **sound/FX** (FMOD `StudioEventEmitter.Play`,
+  `GameObject.SetActive`). Gameplay wiring is done **in code** (controllers hold references to the dials and read
+  them). ⇒ Sync the input component's value; the controllers on each machine will follow it.
+- `ClickEvent` is **only used by the settings menu UI** — not a gameplay button.
+- Physical buttons are `Interactable` objects named `Universal Button …` (e.g. `Gun System Left[0]/--Reloading Console[3]/Universal Button Load shell Rammer[7]`,
+  `Artillery Computer Console[0]/Calculate Universal Button[3]`). The click handler is **`LookAtTarget`** — see below.
+- **UnityExplorer 4.13.6 does not work on this game** (Unity 6000.3): its LateInit throws
+  `NotSupportedException: Method unstripping failed` in `SceneManager.GetAllScenes()`, so no UI / F7. Our own recon replaces it for now.
+
+### Key controls (Master Turret Scene)
+
+| Control | Path | Component | Range |
+|---|---|---|---|
+| Turret traverse wheel | `Turret[0]/Rotation Console[13]/.Wheel Parent[1]/.Spur Gear 12 DRIVER[0]` | `DialInteractable` | unlimited (value was -25200) |
+| Elevation wheel L / R | `Turret[0]/Elevation Console[14]/.Wheel Parent Elevation Left[2]/.Spur Gear 12 DRIVER.002[0]` (Right: `…Right[3]/….001[0]`) | `DialInteractable` | 0..60 |
+| Elevation lever L / R | `Turret[0]/Elevation Console[14]/.Elevation Lever Baseplate[1]/.Elevation Lever Left[4]` / `Right[5]` | `LinearSliderInteractable` | 0..60 |
+| Elevation indicators (Desired/Current L/R) | same baseplate, `[0]..[3]` | `LinearSliderInteractable` (display only?) | 0..60 |
+| Locking levers (rotation / elevation) | `Aiming Console[0]/Locking Lever Rotation[21]/Lever[0]`, `…Elevation[22]/Lever[0]` | `DialInteractable` | -1..1 |
+| Trigger chain | `Trigger Console[0]/.Trigger Rail Cart[9]/.Trigger Core[1]/.Trigger Chain Track[9]/.Trigger chain parent[0]` | `LinearSliderInteractable` | 0..100 |
+| Engine starter chain | `EngineControls[0]/Engine Controls[11]/.Starter Chain Track.001[2]/.Starter chain parent.001[0]` | `LinearSliderInteractable` | 0..100 |
+| Ballistic computer charge / range | `Artillery Computer Console[0]/Balistic Calculator Controls[4]/.Charge Dial Parent[1]/.Charge Dial[0]` / `.Range Dial Parent[4]/.Range Dial[0]` | `DialInteractable` | 1..6 / 0..30 |
+| Pressure valves (×18) | `…/PressureSystem_*/PressureValve*/Dial[4]` | `DialInteractable` (+ `ValveController`) | 0..100 |
+| Reload buttons | `Gun System {Left,Right}[0]/--Reloading Console[3]/Universal Button {Move Cylinder[6], Load shell Rammer[7], Charge Rammer (1)[8]}` | `Interactable` + `LookAtTarget` | — |
+| Powder charge buttons | `…/--Reloading Console[3]/PowderChargeController[10]/Button Dispencer (1..6)` | `Interactable` + `LookAtTarget` | — |
+
+Controllers: `TurretController` at `Tactical Map[0]/Canvas[0]/TurretSystem[4]`, `GunController` ×2 at `…/TurretSystem[4]/GunLeft[0]` and `GunRight[1]`,
+`ArtilleryReloadController` at `Gun System {Left,Right}[0]/--Reloading Console[3]`, `ArtilleryComputer` at `Artillery Computer Console[0]`,
+`MissionManager` at `- Game Wireing -----[0]/MissionManager[1]`, `FirstPersonController` at `FirstPersonController[0]` (root).
+
+Per-player only (never sync): `Record Player[0]/…/.Volume Dial[0]`, espresso machine dials, settings UI.
+
+## Buttons: `LookAtTarget` ✅ (recon v2)
+
+Every physical button GameObject = `Interactable` + `LookAtTarget` + 4× `AnimatorBoolToggler` (115 of them in the scene).
+
+- Click path: `DynamicCursorManager` → `LookAtTarget.HandleClickDownFromManager(pressTarget)` / `HandleClickUpFromManager(...)`
+  → `OnClickDown()` / `OnClickUp()` → UnityEvents `onClickDown`, `onClickUp`, `onActivated`, `onDeactivated`.
+- Inspector wiring is only visuals/animation (`AnimatorBoolToggler.ToggleBool`, steam particles, hover highlight).
+  **Gameplay subscribes from code** via `RegisterOnClickDown(action)` / `RegisterOnClickUp` / `RegisterOnActivated`
+  (e.g. `ArtilleryReloadController.RegisterAdvanceButtonListeners()`).
+- **Malfunctions are random:** `useMalfunctions`, `EvaluateMalfunction()`, `onDeadPress`, `onDoublePress`, chance curves
+  linked to the pressure system. ⇒ the host must decide the outcome of a press, or machines will diverge.
+- State: `isActive`, `SetActive(active)`, `GetActive()`, `ResetButton()`, click cooldown (`useClickCooldown`).
+
+**Sync plan:** hook **`OnClickDown()`** (fires once per real press). `HandleClickDownFromManager` is *broadcast to
+every subscribed button* on every click (9840 calls for 34 presses in testing), so it can't detect a press.
+Remote presses get applied with `OnClickDown()` ✅ — verified with the debug replay key (Backslash; F9 is a media key on
+the dev keyboard): calling it directly runs the press and is tagged `[remote]` by echo suppression.
+**Gotcha:** `OnClickDown()` calls `EvaluateMalfunction()` itself, so a replayed press **re-rolls the malfunction
+locally**. For co-op the receiver must be forced to the host's result (e.g. prefix `EvaluateMalfunction` to set
+`currentMalfunction` from the message and skip the roll while `Net.ApplyingRemote`).
+
+## Verified Harmony hooks (Milestone 2, tutorial mission 1, 2026-11-17) ✅
+
+All patches applied (`Harmony patched 14 methods`) and all fired — none inlined.
+
+| Hook | Fires when | Notes |
+|---|---|---|
+| `LookAtTarget.OnClickDown` | each real button press | sync hook for buttons |
+| `LookAtTarget.EvaluateMalfunction` | presses on malfunction-enabled buttons | outcome in `currentMalfunction` |
+| `LookAtTarget.HandleClickDownFromManager` | every click × every button | ❌ not usable as a press hook |
+| `DialInteractable.BeginDialDrag` / `EndDialDrag` | grab / release a dial or wheel | |
+| `LinearSliderInteractable.BeginSliderDrag` / `EndSliderDrag` | grab / release a lever | End fired 1× vs Begin 5× — 🔍 release may go another path |
+| `TurretController.OnBeginRotationDialDrag` / `OnEndRotationDialDrag` | grab / release traverse wheel | |
+| `ArtilleryReloadController.SetState` | every reload step (32 in tutorial) | logs before → after index |
+| `GunController.FireShell` | each shot | |
+| `MissionManager.LoadMission` / `StartMissionRuntime` / `FinishMission` | mission start / end | |
+
+**Stable IDs changed:** raw sibling indices are *not* stable (`Turret/Elevation Console` went from `[14]` to `[13]`
+mid-session). IDs are now `scene:name/path`, with `#n` only for same-named siblings (`Ids.cs`). Name-path collisions in
+`Master Turret Scene`: the table lamp's two `Universal Button`s (handled by `#n`) and 8 runtime `MapToken_Artillery`
+draggables (spawned at runtime — will need `MissionSaveIdentity` instead).
+
+## Next: open questions (🔍)
+
+1. Visually: did the replayed lamp press animate/toggle the lamp like a real click?
+4. Why `EndSliderDrag` fired once for five `BeginSliderDrag`s.
+2. Are the "Elevation Desired/Current" sliders player-draggable or just indicators?
+3. How the turret wheel's unlimited value maps to rotation (`TurretController.MapDialToTurretRotation`).
