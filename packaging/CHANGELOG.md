@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.4
+- **Smoother remote controls:** wheels and levers turned by another player glide instead of stepping.
+- **Ping over Steam:** shown next to each player in the co-op menu and in the guest's status line.
+- **Steam invites:** while hosting over Steam, friends see *Join Game* on you, and the co-op menu has
+  **Invite Steam friends** (Steam's own invite dialog). Friends should start the game through r2modman first; you then
+  appear in their co-op menu under *Join <your name>*.
+
 ## 0.9.3
 - **Name tags** above every player's avatar (your Steam name, or set `PlayerName`), in the game's own font and
   the player's colour, always facing you. The co-op menu lists players by name.

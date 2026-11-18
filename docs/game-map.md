@@ -465,3 +465,15 @@ draggables (spawned at runtime — will need `MissionSaveIdentity` instead).
   Tag = `Text3D.Create` (clone of the clipboard's 3D TextMeshPro, rich text off), 2.1 m up (1.6 crouched), turned to
   `Camera.main` each frame. Names survive avatar timeouts; forgotten on leave.
 - **0.9.3 check ✅:** host received `player 1 is 'FakePeer'` before the avatar existed; avatar created with its tag (no template warning); removed on leave.
+
+## 0.9.4: smoothing, Steam ping, Steam invites (2026-11-17)
+
+- **Smoothing:** received control values become targets; `ControlSync.Glide()` moves each control toward its target
+  every frame (rate 18/s), snapping for big jumps (> 720 on unlimited dials) and stopping when the local player grabs it.
+- **Ping:** `ITransport.PingMs`. LiteNetLib: `RoundTripTime`. Steam: the 1 s keep-alive Ping carries a timestamp, the peer
+  echoes it in a new `Pong`, RTT smoothed 70/30. Shown in the menu and the guest status line.
+- **Invites:** exports `ActivateGameOverlayInviteDialogConnectString`, `SetRichPresence`, `ClearRichPresence`,
+  `SteamAPI_SteamApps_v008` + `GetLaunchCommandLine`. Steam host sets rich presence `connect` = `+nestcoop_join <id>`;
+  menu "Invite Steam friends" opens Steam's invite dialog; a game launched with the token auto-joins at the main menu.
+  Limit: Steam launching a non-running game skips r2modman's MelonLoader args; accepting while running fires a Steam
+  callback that isn't hooked — the reliable path is the friend starting via r2modman and using "Join <name>".

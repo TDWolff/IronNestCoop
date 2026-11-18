@@ -56,15 +56,22 @@ internal static class Net
     /// <summary>Connected peers with display names (for the menu). Guests see just the host.</summary>
     public static IEnumerable<(int id, string name)> Peers => transport == null
         ? Enumerable.Empty<(int, string)>()
-        : peers.Select(id => (id, Role == Role.Host ? $"{Avatars.NameOf(id)} — {transport.DescribePeer(id)}" : $"{Avatars.NameOf(0)} (host)")).ToList();
+        : peers.Select(id => (id, Role == Role.Host ? $"{Avatars.NameOf(id)}{PingText(id)}" : $"{Avatars.NameOf(0)} (host{PingText(id)})")).ToList();
 
     /// <summary>Overlay text; null when offline.</summary>
     public static string StatusLine => Role switch
     {
         Role.Host => $"NestCoop: HOST  ({peers.Count} guest{(peers.Count == 1 ? "" : "s")})",
-        Role.Guest => hostPeer >= 0 ? "NestCoop: GUEST  (connected)" : "NestCoop: GUEST  (connecting...)",
+        Role.Guest => hostPeer >= 0 ? $"NestCoop: GUEST  (connected{PingText(hostPeer)})" : "NestCoop: GUEST  (connecting...)",
         _ => null,
     };
+
+    /// <summary>", 42 ms" when the transport has measured a ping to that peer.</summary>
+    static string PingText(int peer)
+    {
+        int ms = transport?.PingMs(peer) ?? -1;
+        return ms >= 0 ? $", {ms} ms" : "";
+    }
 
     static void Say(string msg)
     {

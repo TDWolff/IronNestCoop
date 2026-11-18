@@ -33,6 +33,12 @@ internal static class SteamApi
     [DllImport(Dll)] static extern IntPtr SteamAPI_SteamFriends_v018();
     [DllImport(Dll)] static extern IntPtr SteamAPI_SteamUser_v023();
     [DllImport(Dll)] static extern IntPtr SteamAPI_SteamUtils_v010();
+    [DllImport(Dll)] static extern IntPtr SteamAPI_SteamApps_v008();
+    [DllImport(Dll)] static extern void SteamAPI_ISteamFriends_ActivateGameOverlayInviteDialogConnectString(IntPtr self, [MarshalAs(UnmanagedType.LPUTF8Str)] string connect);
+    [DllImport(Dll)] [return: MarshalAs(UnmanagedType.I1)]
+    static extern bool SteamAPI_ISteamFriends_SetRichPresence(IntPtr self, [MarshalAs(UnmanagedType.LPUTF8Str)] string key, [MarshalAs(UnmanagedType.LPUTF8Str)] string value);
+    [DllImport(Dll)] static extern void SteamAPI_ISteamFriends_ClearRichPresence(IntPtr self);
+    [DllImport(Dll)] static extern int SteamAPI_ISteamApps_GetLaunchCommandLine(IntPtr self, byte[] buffer, int size);
 
     [DllImport(Dll)] [return: MarshalAs(UnmanagedType.I1)]
     static extern bool SteamAPI_ISteamNetworking_SendP2PPacket(IntPtr self, ulong steamIdRemote, byte[] data, uint size, P2PSend type, int channel);
@@ -110,6 +116,25 @@ internal static class SteamApi
                 list.Add((id, NameOf(id)));
         }
         return list;
+    }
+
+    // ---- invites (0.9.4) ----
+
+    /// <summary>Steam overlay's invite dialog; invited friends get this connect string.</summary>
+    public static void OpenInviteDialog(string connect) => SteamAPI_ISteamFriends_ActivateGameOverlayInviteDialogConnectString(friends, connect);
+
+    /// <summary>Rich presence: "connect" makes Steam show Join Game on us; "status" is the text friends see.</summary>
+    public static void SetPresence(string key, string value) => SteamAPI_ISteamFriends_SetRichPresence(friends, key, value);
+    public static void ClearPresence() => SteamAPI_ISteamFriends_ClearRichPresence(friends);
+
+    /// <summary>The command line Steam launched us with from an invite / Join Game ("" if none).</summary>
+    public static string LaunchCommandLine()
+    {
+        var apps = SteamAPI_SteamApps_v008();
+        if (apps == IntPtr.Zero) return "";
+        var buf = new byte[1024];
+        int n = SteamAPI_ISteamApps_GetLaunchCommandLine(apps, buf, buf.Length);
+        return n > 0 ? System.Text.Encoding.UTF8.GetString(buf, 0, Math.Min(n, buf.Length)).TrimEnd('\0') : "";
     }
 
     static string Utf8(IntPtr p) => p == IntPtr.Zero ? "" : Marshal.PtrToStringUTF8(p) ?? "";

@@ -34,6 +34,8 @@ internal static class ControlSync
         public DialInteractable Dial;
         public LinearSliderInteractable Slider;
         public float LastSent = float.NaN;
+        /// <summary>Smoothing (0.9.4): remote values arrive ~20×/s; we glide toward the latest one every frame.</summary>
+        public float Target; public bool Smoothing;
         public bool Verified;
 
         public float Get() => Dial != null ? Dial.AccumulatedValue : Slider.Value;
@@ -84,6 +86,7 @@ internal static class ControlSync
         float now = Time.unscaledTime;
         bool remoteTraverse = RemoteTraverseDrag();
         TurretProbe.Update(remoteTraverse);
+        Glide();
 
         if (now >= nextControlTick)
         {
@@ -268,11 +271,11 @@ internal static class ControlSync
                 if (Net.Role == Role.Host)
                 {
                     heldBy.TryAdd(id, from); // a value from a guest means they're driving it
-                    Apply(c, v);
+                    SetTarget(c, v);
                     c.LastSent = v;
                     Net.Broadcast(raw, reliable: false, exceptPeer: from);
                 }
-                else if (!c.Dragging) Apply(c, v);
+                else if (!c.Dragging) SetTarget(c, v);
                 break;
             }
             case MsgType.ControlGrab:
@@ -305,6 +308,37 @@ internal static class ControlSync
             case MsgType.TurretState:
                 ApplyTurretState(r);
                 break;
+        }
+    }
+
+    // ---------------- Smoothing (0.9.4) ----------------
+    // Remote wheel/lever values used to be applied as they arrived (20×/s), which looks steppy over the internet.
+    // Now a received value becomes a target and the control glides to it every frame (exponential, ~70 ms to settle).
+    // Big jumps (snapshot on join, > SnapDistance) and grab/release values still apply at once. The traverse wheel
+    // isn't smoothed here: it follows the turret, which already moves smoothly (host-driven).
+
+    const float SmoothRate = 18f;   // 1/s
+    static float SnapDistance(Control c) => c.Dial != null && c.Dial.dialMode == DialInteractable.DialMode.Unlimited ? 720f : 1e9f;
+
+    static void SetTarget(Control c, float v)
+    {
+        if (Mathf.Abs(v - c.Get()) > SnapDistance(c)) { c.Smoothing = false; Apply(c, v); return; }
+        c.Target = v;
+        c.Smoothing = true;
+    }
+
+    static void Glide()
+    {
+        if (controls.Count == 0) return;
+        float k = 1f - Mathf.Exp(-SmoothRate * Time.unscaledDeltaTime);
+        foreach (var c in controls.Values)
+        {
+            if (!c.Smoothing) continue;
+            if (!c.Alive || c.Dragging) { c.Smoothing = false; continue; } // our own hand wins
+            float cur = c.Get();
+            float d = c.Target - cur;
+            if (Mathf.Abs(d) < 0.01f) { Apply(c, c.Target); c.Smoothing = false; continue; }
+            Apply(c, cur + d * k);
         }
     }
 

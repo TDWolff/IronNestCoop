@@ -26,7 +26,7 @@ Both players:
 4. Start modded again.
 
 Then:
-- **Host:** be in the game, press **Home**. The top-left shows `HOST`.
+- **Host:** be in the game, press **Home** (or ` → Host co-op). Use ` → **Invite Steam friends** to send Steam invites. The top-left shows `HOST`.
 - **Guest:** be friends with the host on Steam, be in the game, press **End**. It joins the first friend it finds
   playing IRON NEST. To pick someone specific, set `SteamJoinTarget` to part of their Steam name or their SteamID64.
 - **Leave:** press **Delete**.

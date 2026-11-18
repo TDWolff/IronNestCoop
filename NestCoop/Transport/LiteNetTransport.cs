@@ -108,8 +108,9 @@ internal sealed class LiteNetTransport : ITransport
         _ => r.ToString(),
     };
 
-    public string DescribePeer(int peer) =>
-        peerOf.TryGetValue(peer, out var p) ? $"Peer #{peer} ({p.RoundTripTime} ms)" : $"Peer #{peer}";
+    public int PingMs(int peer) => peerOf.TryGetValue(peer, out var p) ? p.RoundTripTime : -1;
+
+    public string DescribePeer(int peer) => $"Peer #{peer}";
 
     public void Stop()
     {

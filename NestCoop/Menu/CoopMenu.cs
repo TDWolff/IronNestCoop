@@ -64,6 +64,7 @@ internal static class CoopMenu
     public static void Host() { Clicked("Host"); Net.StartHost(); }
     public static void Join() { Clicked("Join"); Net.Join(); }
     public static void JoinFriend(ulong steamId) { Clicked($"Join friend {steamId}"); Net.Join(steamId.ToString()); }
+    public static void InviteFriends() { Clicked("Invite Steam friends"); SteamInvite.OpenDialog(); }
     public static void Resync() { Clicked("Resync from host"); Snapshot.RequestResync(); }
     public static void Leave() { Clicked("Leave"); Net.Stop("left via menu"); }
 

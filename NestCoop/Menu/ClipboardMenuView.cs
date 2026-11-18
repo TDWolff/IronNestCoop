@@ -134,6 +134,7 @@ internal sealed class ClipboardMenuView : IMenuView
         else
         {
             items.Add(("Leave session", CoopMenu.Leave));
+            if (CoopMenu.Role == Role.Host && CoopMenu.UsingSteam) items.Add(("Invite Steam friends", CoopMenu.InviteFriends));
             if (CoopMenu.Role == Role.Guest) items.Add(("Resync from host", CoopMenu.Resync));
             foreach (var (_, name) in CoopMenu.Peers.Take(4)) items.Add(($"• {name}", null));
         }

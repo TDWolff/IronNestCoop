@@ -1,12 +1,12 @@
-# Two-player Steam test plan (NestCoop 0.9.3)
+# Two-player Steam test plan (NestCoop 0.9.4)
 
 Everything below can only be checked with **two PCs and two Steam accounts that both own IRON NEST** (the game won't
 run twice on one PC, and Steam can't connect you to yourself). Tick items off as you go; after the session, send the
 `MelonLoader/Latest.log` from **both** profiles.
 
 ## Setup (both players)
-- [ ] Same game build (log line `NestCoop 0.9.3 loaded (key NestCoop|0.9.3|<game build>)` must show the same key).
-- [ ] Import `TDWolff-NestCoop-0.9.3.zip` in r2modman (Settings → Import local mod) into a **fresh** profile.
+- [ ] Same game build (log line `NestCoop 0.9.4 loaded (key NestCoop|0.9.4|<game build>)` must show the same key).
+- [ ] Import `TDWolff-NestCoop-0.9.4.zip` in r2modman (Settings → Import local mod) into a **fresh** profile.
 - [ ] Launch once, quit, set in `UserData/MelonPreferences.cfg` under `[NestCoop]`:
       `Transport = "Steam"` and `DebugLog = true` (for the test logs).
 - [ ] Be Steam friends; both in the game's main menu.
@@ -15,6 +15,9 @@ run twice on one PC, and Steam can't connect you to yourself). Tick items off as
 - [ ] Host: ` → Host co-op (or Home). Top-left shows `HOST (0 guests)`.
 - [ ] Guest: ` → the host's name under "Join …" (or Join first friend). Guest shows `GUEST (connected)`; host shows
       `Guest #1 joined`.
+- [ ] Ping shows in the menu next to each player and in the guest's status line (e.g. `GUEST (connected, 42 ms)`).
+- [ ] Host: ` → Invite Steam friends → Steam's invite dialog opens; the friend gets the invite. In the friend's Steam
+      friends list the host shows "Join Game".
 - [ ] Version mismatch (optional): guest on 0.8.0 → host refuses; guest sees "Version mismatch — NestCoop: host has 0.9.0…".
 
 ## 2. Lobby → mission
@@ -27,7 +30,7 @@ run twice on one PC, and Steam can't connect you to yourself). Tick items off as
 - [ ] Guest cranks the traverse wheel → **host's** turret turns; guest's turret follows smoothly (log `ControlSync 5s …
       turret snaps/blends, max err`; snaps should be rare).
 - [ ] Both grab the same wheel → the second grabber has no effect while the first holds it.
-- [ ] Elevation wheels/levers, valves, chains move on both.
+- [ ] Elevation wheels/levers, valves, chains move on both — smoothly, not in steps.
 
 ## 4. Combat (host-authoritative, new in 0.9.0)
 - [ ] Guest pulls the trigger chain → the **host's** gun fires; the guest sees its shell fire right after

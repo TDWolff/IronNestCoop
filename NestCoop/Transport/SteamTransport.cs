@@ -13,7 +13,12 @@ namespace NestCoop.Transport;
 /// </summary>
 internal sealed class SteamTransport : ITransport
 {
-    enum Ctl : byte { Hello = 1, Welcome = 2, Reject = 3, Ping = 4, Bye = 5 }
+    enum Ctl : byte { Hello = 1, Welcome = 2, Reject = 3, Ping = 4, Bye = 5, Pong = 6 }
+
+    // Ping (0.9.4): ISteamNetworking has no ping API, so the 1 s keep-alive Ping carries our send time (ms) and the
+    // other side echoes it in a Pong; round-trip times are smoothed per peer.
+    static readonly System.Diagnostics.Stopwatch clock = System.Diagnostics.Stopwatch.StartNew();
+    readonly Dictionary<ulong, float> rtt = new();
     const byte FrameControl = 0, FrameData = 1;
 
     readonly string key;
@@ -52,6 +57,7 @@ internal sealed class SteamTransport : ITransport
     {
         if (!Ready()) return false;
         isHost = running = true;
+        SteamInvite.OnHostingStarted();
         Mod.Log.Msg($"Steam: hosting as {SteamApi.MyName} ({SteamApi.MySteamId}), app {SteamApi.AppId}. Friends can join from their game.");
         LogFriendsInGame();
         return true;
@@ -130,7 +136,7 @@ internal sealed class SteamTransport : ITransport
             foreach (var sid in idOf.Keys.ToList())
             {
                 if (now - lastHeard.GetValueOrDefault(sid, now) > 10f) { Drop(sid, "timed out"); continue; }
-                SendControl(sid, Ctl.Ping, "");
+                SendControl(sid, Ctl.Ping, clock.ElapsedMilliseconds.ToString());
             }
         }
     }
@@ -171,6 +177,14 @@ internal sealed class SteamTransport : ITransport
                 if (idOf.ContainsKey(from)) Drop(from, "left");
                 break;
             case Ctl.Ping:
+                if (idOf.ContainsKey(from)) SendControl(from, Ctl.Pong, text); // echo the sender's timestamp
+                break;
+            case Ctl.Pong:
+                if (long.TryParse(text, out long sent))
+                {
+                    float ms = clock.ElapsedMilliseconds - sent;
+                    rtt[from] = rtt.TryGetValue(from, out float old) ? old * 0.7f + ms * 0.3f : ms;
+                }
                 break;
         }
     }
@@ -223,6 +237,9 @@ internal sealed class SteamTransport : ITransport
             if (id != exceptPeer) SteamApi.Send(sid, framed, reliable);
     }
 
+    public int PingMs(int peer) =>
+        steamOf.TryGetValue(peer, out ulong sid) && rtt.TryGetValue(sid, out float ms) ? (int)ms : -1;
+
     public string DescribePeer(int peer) =>
         steamOf.TryGetValue(peer, out ulong sid) ? SteamApi.NameOf(sid) : $"Peer #{peer}";
 
@@ -230,12 +247,13 @@ internal sealed class SteamTransport : ITransport
     {
         if (!running) return;
         running = false;
+        if (isHost) SteamInvite.OnStopped();
         foreach (var sid in idOf.Keys.ToList())
         {
             SendControl(sid, Ctl.Bye, "");
             SteamApi.Close(sid);
         }
         if (!isHost && target != 0) SteamApi.Close(target);
-        idOf.Clear(); steamOf.Clear(); lastHeard.Clear();
+        idOf.Clear(); steamOf.Clear(); lastHeard.Clear(); rtt.Clear();
     }
 }

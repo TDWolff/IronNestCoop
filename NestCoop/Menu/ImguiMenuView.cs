@@ -84,6 +84,7 @@ internal sealed class ImguiMenuView : IMenuView
         else
         {
             if (Button(Next(32), "Leave session")) CoopMenu.Leave();
+            if (CoopMenu.Role == Role.Host && CoopMenu.UsingSteam && Button(Next(), "Invite Steam friends")) CoopMenu.InviteFriends();
             if (CoopMenu.Role == Role.Guest && Button(Next(), "Resync from host")) CoopMenu.Resync();
         }
         Space();
