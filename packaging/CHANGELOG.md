@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.9.8
 - **Players are floating crew heads** instead of capsules: a tanker helmet with goggles, with the helmet band in the
   player's colour, turning and tilting with where they look, and a shadow on the floor where they stand. Heads sit at
   the game's real eye height (measured from your own player).
