@@ -7,5 +7,6 @@ dump/
 dist/
 fakepeer-checkpoint.json
 
-# Blender backups
+# Blender files: kept local (a .blend stores its absolute save path); the model ships as NestCoop/Assets/avatar-head.mesh.txt
+*.blend
 *.blend1
