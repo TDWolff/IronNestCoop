@@ -13,7 +13,8 @@ Online co-op for **IRON NEST: Heavy Turret Simulator**. Several players share on
 - Missions: the host picks the mission and decides win or fail; everyone follows with the same mission seed
 - Mission state: guests get the host's full mission state (objectives, map, messages, punchcards, enemies) when
   they join, including mid-mission or when the host resumes from a checkpoint
-- Players, shown as coloured capsules with a visor and a name tag
+- Carried items: punchcards, map tokens and cards you move, slot or put in a deck
+- Players, shown as floating crew heads with a name tag
 
 Not synced on purpose: operating manuals, the espresso machine, the record player, menus and settings.
 
@@ -63,7 +64,8 @@ r2modman profile (Settings → Browse profile folder).
 ## Known limitations
 - Co-op doesn't pause: during a session, the Esc menu and alt-tab don't freeze the game.
 - Only the host picks, starts and finishes missions.
-- Carried items (cards, map tokens, records) aren't synced yet.
+- Records and the record player aren't synced (on purpose). An item on someone's clipboard is hidden for the others
+  until they put it down.
 - Leaderboards: any run that had a co-op session is automatically kept off the leaderboards (the game's own opt-out is
   switched on for that run). Solo runs with the mod installed still count.
 

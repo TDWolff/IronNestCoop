@@ -51,6 +51,8 @@
     <Reference Include="Unity.TextMeshPro"><HintPath>$(Il2CppAsm)\Unity.TextMeshPro.dll</HintPath></Reference>
     <Reference Include="UnityEngine.UIModule"><HintPath>$(Il2CppAsm)\UnityEngine.UIModule.dll</HintPath></Reference>
     <Reference Include="Il2CppKamgam.UGUIComponentsForSettings"><HintPath>$(Il2CppAsm)\Il2CppKamgam.UGUIComponentsForSettings.dll</HintPath></Reference>
+    <Reference Include="Il2CppHeathen.Steamworks"><HintPath>$(Il2CppAsm)\Il2CppHeathen.Steamworks.dll</HintPath></Reference>
+    <Reference Include="Il2Cppcom.rlabrecque.steamworks.net"><HintPath>$(Il2CppAsm)\Il2Cppcom.rlabrecque.steamworks.net.dll</HintPath></Reference>
     <Reference Include="Il2CppNewtonsoft.Json"><HintPath>$(Il2CppAsm)\Il2CppNewtonsoft.Json.dll</HintPath></Reference>
     <Reference Include="UnityEngine.CoreModule"><HintPath>$(Il2CppAsm)\UnityEngine.CoreModule.dll</HintPath></Reference>
   </ItemGroup>

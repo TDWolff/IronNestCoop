@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.9
+- **Carried items are synced:** punchcards, map tokens and cards someone moves, slots or puts in a deck end up in
+  the same place for everyone (placed with the game's own checkpoint code). An item on a player's clipboard is
+  hidden for the others until it's put down.
+- **Accepting a Steam invite (or Join Game) while the game is running** now joins the host straight away, leaving
+  your current session first if you're in one.
+
 ## 0.9.8
 - **Players are floating crew heads** instead of capsules: a tanker helmet with goggles, with the helmet band in the
   player's colour, turning and tilting with where they look, and a shadow on the floor where they stand. Heads sit at

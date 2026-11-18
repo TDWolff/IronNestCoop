@@ -27,6 +27,7 @@ internal static class DebugKeys
         if (Mod.DebugLog.Value && Pressed(Mod.ReplayKey.Value)) ReplayLastPress();
         if (Mod.DebugLog.Value && Pressed(Mod.MissionReplayKey.Value)) MissionSync.DebugReplay();
         if (Mod.DebugLog.Value && Pressed(Mod.CheckpointTestKey.Value)) Snapshot.DebugRoundTrip();
+        if (Mod.DebugLog.Value && Pressed(Mod.ItemReplayKey.Value)) ItemSync.DebugReplay();
         if (Mod.DebugLog.Value && Pressed(Mod.SteamCheckKey.Value)) SteamCheck();
     }
 

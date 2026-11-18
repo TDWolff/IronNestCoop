@@ -1,12 +1,12 @@
-# Two-player Steam test plan (NestCoop 0.9.8)
+# Two-player Steam test plan (NestCoop 0.9.9)
 
 Everything below can only be checked with **two PCs and two Steam accounts that both own IRON NEST** (the game won't
 run twice on one PC, and Steam can't connect you to yourself). Tick items off as you go; after the session, send the
 saved session logs from **both** profiles: `UserData/NestCoop/logs/` (saved automatically when a session ends).
 
 ## Setup (both players)
-- [ ] Same game build (log line `NestCoop 0.9.8 loaded (key NestCoop|0.9.8|<game build>)` must show the same key).
-- [ ] Import `TDWolff-NestCoop-0.9.8.zip` in r2modman (Settings → Import local mod) into a **fresh** profile.
+- [ ] Same game build (log line `NestCoop 0.9.9 loaded (key NestCoop|0.9.9|<game build>)` must show the same key).
+- [ ] Import `TDWolff-NestCoop-0.9.9.zip` in r2modman (Settings → Import local mod) into a **fresh** profile.
 - [ ] Launch once, quit, set in `UserData/MelonPreferences.cfg` under `[NestCoop]`:
       `Transport = "Steam"` and `DebugLog = true` (for the test logs).
 - [ ] Be Steam friends; both in the game's main menu.
@@ -18,6 +18,9 @@ saved session logs from **both** profiles: `UserData/NestCoop/logs/` (saved auto
 - [ ] Ping shows in the menu next to each player and in the guest's status line (e.g. `GUEST (connected, 42 ms)`).
 - [ ] Host: ` → Invite Steam friends → Steam's invite dialog opens; the friend gets the invite. In the friend's Steam
       friends list the host shows "Join Game".
+- [ ] Friend **already in the modded game, not connected**: accept the invite (or Shift+Tab → host → Join Game) →
+      the guest joins without using the co-op menu. Guest log: `SteamInvite: Steam join request '+nestcoop_join …'`,
+      then `joining … from a Steam invite`. At start the log must show `SteamInvite: listening for Steam invites`.
 - [ ] Version mismatch (optional): guest on 0.8.0 → host refuses; guest sees "Version mismatch — NestCoop: host has 0.9.0…".
 
 ## 2. Lobby → mission
@@ -65,3 +68,10 @@ saved session logs from **both** profiles: `UserData/NestCoop/logs/` (saved auto
 
 ## Report back
 Both players' newest files from `UserData/NestCoop/logs/`, plus anything that looked wrong (with the time it happened).
+
+## Carried items (0.9.9)
+- [ ] In a mission, one player moves a map token on the map table → it ends up in the same spot for the other.
+- [ ] A punchcard dragged into the requisition slot (or another slot) → it's in the slot for the other too.
+- [ ] Picking a card up to your clipboard → it disappears for the other; putting it down → it reappears there.
+- [ ] Both grab the same item at once → whoever lets go last wins; no errors in either log.
+- [ ] Logs (DebugLog on): `ItemSync: sent …` on the mover, `FIRST HIT ItemSync.Apply …` on the other.

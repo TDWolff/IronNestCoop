@@ -20,6 +20,7 @@ internal enum MsgType : byte
     TurretMove = 14,        // 3×float worldPos, bool dodge          (guest → host request; host → guests)
     ValveDamage = 15,       // string valveId, float damage01                                      (host → guests)
     PlayerInfo = 16,        // int playerId, string displayName   (guest → host; host → guests)
+    ItemState = 17,         // string itemId, byte location, string slot/deckId, string stateJson (mover → host → others)
     PlayerLeft = 9,    // int playerId                                         (host → guests)
     PlayerPose = 8,    // int playerId, 3×float feet, 4×float head rotation, bool crouched (unreliable; host relays)
     TurretState = 5,   // float angle, float desired, float velocity, int n, n×float gunElevation (host → guests)
@@ -127,6 +128,7 @@ internal static class Net
         Combat.Reset();
         CoopPause.Reset();
         Avatars.Reset();
+        ItemSync.Reset();
         t.Stop();
         LogSaver.OnSessionEnded(why);
     }
@@ -308,6 +310,9 @@ internal static class Net
                     break;
                 case MsgType.PlayerInfo:
                     Avatars.HandleInfo(from, r);
+                    break;
+                case MsgType.ItemState:
+                    ItemSync.Handle(from, r, data);
                     break;
                 case MsgType.PlayerLeft:
                 {
