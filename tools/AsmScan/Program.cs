@@ -45,8 +45,22 @@ foreach (var th in md.TypeDefinitions)
     if (!t.GetDeclaringType().IsNil) full = Name(t.GetDeclaringType()) + "/" + name;
     types++;
     output.WriteLine($"TYPE {full} : {Name(t.BaseType)}");
+    if (Name(t.BaseType) == "System.Enum")
+        foreach (var fh in t.GetFields())
+        {
+            var f = md.GetFieldDefinition(fh);
+            if ((f.Attributes & FieldAttributes.Static) == 0) continue; // skip value__
+            var c = f.GetDefaultValue();
+            string val = c.IsNil ? "?" : md.GetBlobReader(md.GetConstant(c).Value).ReadConstant(md.GetConstant(c).TypeCode)?.ToString();
+            output.WriteLine($"  E {md.GetString(f.Name)} = {val}");
+        }
     foreach (var ph in t.GetProperties())
-        output.WriteLine($"  P {md.GetString(md.GetPropertyDefinition(ph).Name)}");
+    {
+        var pd = md.GetPropertyDefinition(ph);
+        string ptype;
+        try { ptype = pd.DecodeSignature(new SigNames(md), null).ReturnType; } catch { ptype = "?"; }
+        output.WriteLine($"  P {md.GetString(pd.Name)} : {ptype}");
+    }
     foreach (var mh in t.GetMethods())
     {
         var m = md.GetMethodDefinition(mh);

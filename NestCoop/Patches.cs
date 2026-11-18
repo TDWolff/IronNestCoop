@@ -52,15 +52,21 @@ static class LookAtTarget_EvaluateMalfunction
 [HarmonyPatch(typeof(DialInteractable), nameof(DialInteractable.BeginDialDrag))]
 static class DialInteractable_BeginDialDrag
 {
-    static void Postfix(DialInteractable __instance) =>
+    static void Postfix(DialInteractable __instance)
+    {
         PatchLog.Hit("DialInteractable.BeginDialDrag", $"{Ids.Of(__instance)} value={__instance.AccumulatedValue:0.###}");
+        if (!Net.ApplyingRemote) ControlSync.OnLocalGrab(__instance, true);
+    }
 }
 
 [HarmonyPatch(typeof(DialInteractable), nameof(DialInteractable.EndDialDrag))]
 static class DialInteractable_EndDialDrag
 {
-    static void Postfix(DialInteractable __instance) =>
+    static void Postfix(DialInteractable __instance)
+    {
         PatchLog.Hit("DialInteractable.EndDialDrag", $"{Ids.Of(__instance)} value={__instance.AccumulatedValue:0.###}");
+        if (!Net.ApplyingRemote) ControlSync.OnLocalGrab(__instance, false);
+    }
 }
 
 // ---------- Levers / sliders ----------
@@ -68,15 +74,21 @@ static class DialInteractable_EndDialDrag
 [HarmonyPatch(typeof(LinearSliderInteractable), nameof(LinearSliderInteractable.BeginSliderDrag))]
 static class LinearSliderInteractable_BeginSliderDrag
 {
-    static void Postfix(LinearSliderInteractable __instance) =>
+    static void Postfix(LinearSliderInteractable __instance)
+    {
         PatchLog.Hit("LinearSliderInteractable.BeginSliderDrag", $"{Ids.Of(__instance)} value={__instance.Value:0.###}");
+        if (!Net.ApplyingRemote) ControlSync.OnLocalGrab(__instance, true);
+    }
 }
 
 [HarmonyPatch(typeof(LinearSliderInteractable), nameof(LinearSliderInteractable.EndSliderDrag))]
 static class LinearSliderInteractable_EndSliderDrag
 {
-    static void Postfix(LinearSliderInteractable __instance) =>
+    static void Postfix(LinearSliderInteractable __instance)
+    {
         PatchLog.Hit("LinearSliderInteractable.EndSliderDrag", $"{Ids.Of(__instance)} value={__instance.Value:0.###}");
+        if (!Net.ApplyingRemote) ControlSync.OnLocalGrab(__instance, false);
+    }
 }
 
 // ---------- Systems ----------

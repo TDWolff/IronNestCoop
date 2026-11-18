@@ -11,7 +11,10 @@ internal static class Registry
 {
     static readonly Dictionary<Type, Dictionary<string, Component>> caches = new();
 
-    public static void Invalidate() => caches.Clear();
+    /// <summary>Bumped on every invalidation, so other caches built from the registry know to rebuild.</summary>
+    public static int Version { get; private set; }
+
+    public static void Invalidate() { caches.Clear(); Version++; }
 
     public static T Find<T>(string id) where T : Component
     {

@@ -7,19 +7,34 @@
 //   press <id>      send a press for any stable ID (e.g. a non-shared one, to check the host ignores it)
 //   reload <n> <i>  pretend to be authoritative: send ReloadState i for reload controller #n
 //                   (the host must IGNORE this; only the host owns reload state)
+//   controls        numbered list of shared wheels/levers with their last known value
+//   drag <n> <delta> [seconds]   act like a player turning control #n by <delta> (default over 2 s):
+//                   Grab, values at 20 Hz, Release. Try the traverse wheel: the host turret should turn.
+//   turret          print the latest host turret state
 //   quit
 // Protocol must match NestCoop/Net.cs (connection key "NestCoop-<version>", BinaryWriter encoding):
 //   1 ButtonPress:  string id, int32 malfunction
 //   2 ReloadState:  string id, int32 stateIndex
+//   3 ControlValue: string id, float value                      (unreliable)
+//   4 ControlGrab:  string id, bool grabbed, float value
+//   5 TurretState:  float angle, float desired, float velocity, int32 n, n x float gunElevation (unreliable)
 using System.Collections.Concurrent;
 using LiteNetLib;
 
 string address = args.Length > 0 ? args[0] : "127.0.0.1";
 int port = args.Length > 1 ? int.Parse(args[1]) : 27960;
-string version = args.Length > 2 ? args[2] : "0.3.0";
+string version = args.Length > 2 ? args[2] : "0.4.0";
 string key = "NestCoop-" + version;
 
-const byte ButtonPress = 1, ReloadState = 2;
+const byte ButtonPress = 1, ReloadState = 2, ControlValue = 3, ControlGrab = 4, TurretState = 5;
+var controlIds = new List<string>();
+var controlValues = new Dictionary<string, float>();
+string turretLine = "(none yet)";
+int rxValues = 0, rxTurret = 0;
+var stats = System.Diagnostics.Stopwatch.StartNew();
+// active drag: control id, start value, delta, duration
+string dragId = null; float dragFrom = 0, dragDelta = 0, dragSeconds = 2, dragNextSend = 0;
+var dragClock = new System.Diagnostics.Stopwatch();
 var buttons = new List<string>();
 var reloads = new List<string>();
 string lastId = null;
@@ -28,7 +43,7 @@ NetPeer host = null;
 var listener = new EventBasedNetListener();
 var manager = new NetManager(listener) { AutoRecycle = true, DisconnectTimeout = 10000 };
 
-listener.PeerConnectedEvent += p => { host = p; Console.WriteLine("[connected to host] commands: list | again | send <n> | press <id> | reload <n> <i> | quit"); };
+listener.PeerConnectedEvent += p => { host = p; Console.WriteLine("[connected to host] commands: list | again | send <n> | press <id> | reload <n> <i> | controls | drag <n> <delta> [s] | turret | quit"); };
 listener.PeerDisconnectedEvent += (p, info) => { host = null; Console.WriteLine($"[disconnected: {info.Reason}]"); };
 listener.NetworkReceiveEvent += (p, reader, ch, method) =>
 {
@@ -52,6 +67,28 @@ listener.NetworkReceiveEvent += (p, reader, ch, method) =>
             Console.WriteLine($"<- reload #{reloads.IndexOf(id)} {Short(id)} = {index}");
             break;
         }
+        case ControlValue:
+        {
+            string id = r.ReadString(); float v = r.ReadSingle();
+            if (!controlIds.Contains(id)) controlIds.Add(id);
+            controlValues[id] = v; rxValues++;
+            break;
+        }
+        case ControlGrab:
+        {
+            string id = r.ReadString(); bool g = r.ReadBoolean(); float v = r.ReadSingle();
+            controlValues[id] = v;
+            Console.WriteLine($"<- {(g ? "grab" : "release")} {Short(id)} = {v:0.###}");
+            break;
+        }
+        case TurretState:
+        {
+            float a = r.ReadSingle(), d = r.ReadSingle(), vel = r.ReadSingle(); int n = r.ReadInt32();
+            var e = new float[n]; for (int i = 0; i < n; i++) e[i] = r.ReadSingle();
+            turretLine = $"angle {a:0.##}  desired {d:0.##}  vel {vel:0.##}  guns [{string.Join(", ", e.Select(x => x.ToString("0.##")))}]";
+            rxTurret++;
+            break;
+        }
         default: Console.WriteLine($"<- unknown message type {type}"); break;
     }
 };
@@ -66,6 +103,19 @@ new Thread(() => { while (true) { var l = Console.ReadLine(); if (l == null) bre
 while (true)
 {
     manager.PollEvents();
+    if (stats.Elapsed.TotalSeconds >= 5 && rxValues + rxTurret > 0)
+    {
+        Console.WriteLine($"   [5s] rx {rxValues} control values, {rxTurret} turret states | turret {turretLine}");
+        rxValues = rxTurret = 0; stats.Restart();
+    }
+    if (dragId != null && host != null)
+    {
+        float t = (float)dragClock.Elapsed.TotalSeconds;
+        float k = Math.Min(1f, t / dragSeconds);
+        float v = dragFrom + dragDelta * k;
+        if (t >= dragNextSend || k >= 1f) { SendValue(ControlValue, dragId, v); dragNextSend = t + 0.05f; }
+        if (k >= 1f) { SendGrab(dragId, false, v); Console.WriteLine($"-> release {Short(dragId)} = {v:0.###}"); controlValues[dragId] = v; dragId = null; }
+    }
     while (input.TryDequeue(out var line))
     {
         var parts = line.Split(' ', 2);
@@ -91,7 +141,26 @@ while (true)
                 else Console.WriteLine("usage: reload <n> <stateIndex>  (see list)");
                 break;
             }
-            default: Console.WriteLine("commands: list | again | send <n> | press <id> | reload <n> <i> | quit"); break;
+            case "controls":
+                for (int i = 0; i < controlIds.Count; i++) Console.WriteLine($"  control #{i}  {controlValues[controlIds[i]],10:0.###}  {Short(controlIds[i])}");
+                if (controlIds.Count == 0) Console.WriteLine("  none yet (the host sends them when you join)");
+                break;
+            case "turret": Console.WriteLine("  turret " + turretLine); break;
+            case "drag":
+            {
+                var a = parts.Length > 1 ? parts[1].Split(' ', StringSplitOptions.RemoveEmptyEntries) : Array.Empty<string>();
+                if (a.Length >= 2 && int.TryParse(a[0], out int cn) && cn >= 0 && cn < controlIds.Count && float.TryParse(a[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float delta))
+                {
+                    dragId = controlIds[cn]; dragFrom = controlValues[dragId]; dragDelta = delta;
+                    dragSeconds = a.Length >= 3 && float.TryParse(a[2], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float sec) ? Math.Max(0.1f, sec) : 2f;
+                    dragNextSend = 0; dragClock.Restart();
+                    SendGrab(dragId, true, dragFrom);
+                    Console.WriteLine($"-> grab {Short(dragId)} at {dragFrom:0.###}, turning by {delta} over {dragSeconds}s");
+                }
+                else Console.WriteLine("usage: drag <n> <delta> [seconds]  (see controls)");
+                break;
+            }
+            default: Console.WriteLine("commands: list | again | send <n> | press <id> | reload <n> <i> | controls | drag <n> <delta> [s] | turret | quit"); break;
         }
     }
     Thread.Sleep(15);
@@ -110,6 +179,21 @@ void Send(byte type, string id, int value, string what)
     using (var w = new BinaryWriter(ms)) { w.Write(type); w.Write(id); w.Write(value); }
     host.Send(ms.ToArray(), DeliveryMethod.ReliableOrdered);
     Console.WriteLine("-> " + what);
+}
+
+void SendValue(byte type, string id, float v)
+{
+    using var ms = new MemoryStream();
+    using (var w = new BinaryWriter(ms)) { w.Write(type); w.Write(id); w.Write(v); }
+    host.Send(ms.ToArray(), DeliveryMethod.Sequenced);
+}
+
+void SendGrab(string id, bool grabbed, float v)
+{
+    if (host == null) return;
+    using var ms = new MemoryStream();
+    using (var w = new BinaryWriter(ms)) { w.Write(ControlGrab); w.Write(id); w.Write(grabbed); w.Write(v); }
+    host.Send(ms.ToArray(), DeliveryMethod.ReliableOrdered);
 }
 
 static string Short(string id) => id.Length <= 90 ? id : "…" + id[^89..];

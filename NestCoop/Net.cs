@@ -9,6 +9,9 @@ internal enum MsgType : byte
 {
     ButtonPress = 1,   // string id, int malfunction        (any → host → others)
     ReloadState = 2,   // string id, int stateIndex         (host → guests, also in join snapshot)
+    ControlValue = 3,  // string id, float value            (dragger → host → others; host → guests) unreliable
+    ControlGrab = 4,   // string id, bool grabbed, float v  (dragger → host → others) reliable
+    TurretState = 5,   // float angle, float desired, float velocity, int n, n×float gunElevation (host → guests)
 }
 
 /// <summary>
@@ -36,7 +39,7 @@ internal static class Net
     public static bool Active => Role != Role.None && transport != null;
 
     static ITransport transport;
-    static int hostPeer = -1; // guest side: the host's peer id
+    internal static int hostPeer = -1; // guest side: the host's peer id
     static readonly HashSet<int> peers = new();
 
     /// <summary>Overlay text; null when offline.</summary>
@@ -82,6 +85,7 @@ internal static class Net
         Role = Role.None;
         hostPeer = -1;
         peers.Clear();
+        ControlSync.Reset();
         t.Stop();
     }
 
@@ -94,11 +98,12 @@ internal static class Net
         {
             peers.Add(id);
             if (Role == Role.Guest) { hostPeer = id; Say("Connected to host"); }
-            else { Say($"Guest #{id} joined"); SendSnapshot(id); }
+            else { Say($"Guest #{id} joined"); SendSnapshot(id); ControlSync.SendSnapshot(id); }
         };
         t.PeerDisconnected += (id, reason) =>
         {
             peers.Remove(id);
+            ControlSync.OnPeerLeft(id);
             Say(Role == Role.Guest ? $"Host left ({reason})" : $"Guest #{id} left ({reason})");
             if (Role == Role.Guest) Stop("lost host");
         };
@@ -108,16 +113,19 @@ internal static class Net
 
     // ---------------- Sending helpers ----------------
 
-    static bool CanSend => Active && !ApplyingRemote && !(Role == Role.Guest && hostPeer < 0);
+    internal static bool CanSend => Active && !ApplyingRemote && !(Role == Role.Guest && hostPeer < 0);
 
     /// <summary>Host → all guests; guest → host.</summary>
-    static void SendToSession(byte[] data, bool reliable)
+    internal static void SendToSession(byte[] data, bool reliable)
     {
         if (Role == Role.Host) transport.Broadcast(data, reliable);
         else transport.Send(hostPeer, data, reliable);
     }
 
-    static byte[] Write(MsgType type, Action<BinaryWriter> body)
+    internal static void Broadcast(byte[] data, bool reliable, int exceptPeer = -1) => transport?.Broadcast(data, reliable, exceptPeer);
+    internal static void SendTo(int peer, byte[] data, bool reliable) => transport?.Send(peer, data, reliable);
+
+    internal static byte[] Write(MsgType type, Action<BinaryWriter> body)
     {
         using var ms = new MemoryStream();
         using (var w = new BinaryWriter(ms)) { w.Write((byte)type); body(w); }
@@ -218,6 +226,11 @@ internal static class Net
                     ApplyReloadState(id, index);
                     break;
                 }
+                case MsgType.ControlValue:
+                case MsgType.ControlGrab:
+                case MsgType.TurretState:
+                    ControlSync.Handle(type, from, r, data);
+                    break;
                 default:
                     Mod.Log.Warning($"Net: unknown message {type} from #{from}");
                     break;

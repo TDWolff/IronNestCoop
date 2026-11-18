@@ -216,3 +216,39 @@ draggables (spawned at runtime — will need `MissionSaveIdentity` instead).
 - **Fix:** the trigger chain and engine starter chain are `LinearSliderInteractable`s that also carry a
   `LookAtTarget`; dragging fired `OnClickDown` every ~150 ms (and the two chains always together). Buttons on
   objects with a slider/dial are now excluded from press sync (`SyncPolicy.IsDragControl`) — M5 syncs them by value.
+
+## Milestone 5: continuous controls (2026-11-17, v0.4.0) — built, untested
+
+- `ControlSync.cs`: every shared `DialInteractable` / `LinearSliderInteractable` syncs by value.
+  Dragger drives it (guest → host 20 Hz unreliable + reliable Grab/Release; host relays); host broadcasts any
+  other change (own drags + game-driven changes such as the traverse wheel backdrive). Guests ignore values for a
+  control they're holding. New guests get a snapshot of all control values.
+- Apply: `SetSliderValue`, `SetDialValue` (Limited dials), `SetAccumulatedValueUnlimited(v, true, true)` (Unlimited).
+  `DialMode`: Unlimited = 0, Limited = 1. **Unverified:** that Unlimited `AccumulatedValue` uses the same units as
+  `SetAccumulatedValueUnlimited(angleDegrees…)` — first apply per control logs before/target/after.
+- Turret: host sends `_CurrentAngle`, `_DesiredRotation`, `rotationVelocity`, gun `_CurrentElevation` at 10 Hz;
+  guests snap if > `TurretSnapDegrees` (5°) off, else blend 30%, then `ApplyRotationToTransforms()`.
+  Guest-side correction can't be tested locally (single-instance game) — needs a real second player.
+- AsmScan now prints property types and enum values.
+- **M5 test 1 (FakePeer):** snapshot of 50 controls ✅; elevation lever (slider) drag ✅ — left gun went to 30;
+  units assumption ✅ (`first apply … Unlimited: -25200 -> target -25200, now -25200`).
+  ❌ Traverse/elevation **wheels spun glitchily and the turret didn't follow**: after release the traverse wheel was
+  back at -25200. Cause: `TurretController` only follows its dial between the dial's `OnBeginDialDrag`/`OnEndDialDrag`
+  (C# `Action`) events; otherwise `BackdriveRotationDial` drives the wheel from the turret → tug-of-war.
+  **Fix:** on remote grab/release, invoke the control's `OnBeginDialDrag`/`OnEndDialDrag` (or slider equivalents) and
+  `OnGrab`/`OnRelease` UnityEvents. Released on peer leave / session stop so the turret can't stay stuck mid-drag.
+- **M5 probe (TurretProbe.cs):** local drag → `DesiredRotation` follows `MapDialToTurretRotation(wheel)` (= wheel / 720:
+  -27496 → -38.19), `desiredRotationVelocity*` stay 0 (speed is NOT what drives it). Remote drag → wheel
+  `IsDragging` false, our value is overwritten next frame by `BackdriveRotationDial` (turret angle × 720 = -27576).
+  So the turret only reads its wheel while the wheel's own `IsDragging` (local mouse) is true.
+  **Fix 2:** while a remote player holds the traverse wheel, set `_DesiredRotation = MapDialToTurretRotation(wheel)`
+  each frame and skip `BackdriveRotationDial` (Harmony prefix). Watch for its FIRST HIT — if it never fires, it's
+  inlined into `TurretController.Update`.
+- **M5 retest:** the `BackdriveRotationDial` prefix **never fired** (no FIRST HIT) — it's inlined into
+  `TurretController.Update`; patch removed. **Fix 3:** the traverse wheel is special-cased: remote values are never
+  written to the wheel; the host sets `_DesiredRotation = MapDialToTurretRotation(value)` and lets the game backdrive the
+  wheel as the turret turns. Drag Actions aren't raised for it (only grab/release sounds), so `OnEndRotationDialDrag`
+  can't cancel a remote turn. Guests follow via `TurretState`.
+- **M5 retest 3 ✅:** FakePeer `drag 23 7200` (wheel -25200 → -18000) turned the host turret -35° → -25° exactly
+  (= -18000 / 720), peaking at 2.99°/s, and the turret settled with desired = angle. Guest-side turret correction
+  (TurretState snap/blend) still needs a real second player to test.
