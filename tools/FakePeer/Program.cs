@@ -13,6 +13,9 @@
 //   turret          print the latest host turret state
 //   mission <phase> pretend to be authoritative: send MissionState (0 menu, 1 map, 2 mission) for the last
 //                   mission seen — the host must IGNORE it (only the host drives missions)
+//   walk [radius]   be a visible player: walk in a circle (default 2 m) around where the host stands now
+//   stand           stand 1.5 m in front of the host, looking at them
+//   still           stop sending a pose (the avatar should vanish after AvatarTimeout)
 //   quit
 // Protocol must match NestCoop/Net.cs (connection key "NestCoop-<version>", BinaryWriter encoding):
 //   1 ButtonPress:  string id, int32 malfunction
@@ -21,16 +24,20 @@
 //   4 ControlGrab:  string id, bool grabbed, float value
 //   6 MissionState: byte phase, string operationId, string missionId, int32 seed
 //   7 MissionEvent: byte kind (1 = FinishMission)
+//   8 PlayerPose:   int32 playerId, 3 x float feet, 4 x float head rotation (x,y,z,w), bool crouched (unreliable)
 //   5 TurretState:  float angle, float desired, float velocity, int32 n, n x float gunElevation (unreliable)
 using System.Collections.Concurrent;
 using LiteNetLib;
 
 string address = args.Length > 0 ? args[0] : "127.0.0.1";
 int port = args.Length > 1 ? int.Parse(args[1]) : 27960;
-string version = args.Length > 2 ? args[2] : "0.5.0";
+string version = args.Length > 2 ? args[2] : "0.6.0";
 string key = "NestCoop-" + version;
 
-const byte ButtonPress = 1, ReloadState = 2, ControlValue = 3, ControlGrab = 4, TurretState = 5, MissionState = 6, MissionEvent = 7;
+const byte ButtonPress = 1, ReloadState = 2, ControlValue = 3, ControlGrab = 4, TurretState = 5, MissionState = 6, MissionEvent = 7, PlayerPose = 8;
+float hx = 0, hy = 0, hz = 0, hostYaw = 0, hostYawAtStart = 0; bool haveHostPose = false;
+string poseMode = null; float cx = 0, cy = 0, cz = 0, radius = 2f;
+var poseClock = System.Diagnostics.Stopwatch.StartNew(); double nextPose = 0;
 string lastOp = "", lastMission = "";
 var controlIds = new List<string>();
 var controlValues = new Dictionary<string, float>();
@@ -48,7 +55,7 @@ NetPeer host = null;
 var listener = new EventBasedNetListener();
 var manager = new NetManager(listener) { AutoRecycle = true, DisconnectTimeout = 10000 };
 
-listener.PeerConnectedEvent += p => { host = p; Console.WriteLine("[connected to host] commands: list | again | send <n> | press <id> | reload <n> <i> | controls | drag <n> <delta> [s] | turret | mission <p> | quit"); };
+listener.PeerConnectedEvent += p => { host = p; Console.WriteLine("[connected to host] commands: list | again | send <n> | press <id> | reload <n> <i> | controls | drag <n> <delta> [s] | turret | mission <p> | walk [r] | stand | still | quit"); };
 listener.PeerDisconnectedEvent += (p, info) => { host = null; Console.WriteLine($"[disconnected: {info.Reason}]"); };
 listener.NetworkReceiveEvent += (p, reader, ch, method) =>
 {
@@ -104,6 +111,16 @@ listener.NetworkReceiveEvent += (p, reader, ch, method) =>
         case MissionEvent:
             Console.WriteLine($"<- mission event {(r.ReadByte() == 1 ? "FinishMission" : "?")}");
             break;
+        case PlayerPose:
+        {
+            int id = r.ReadInt32(); hx = r.ReadSingle(); hy = r.ReadSingle(); hz = r.ReadSingle();
+            float qx = r.ReadSingle(), qy = r.ReadSingle(), qz = r.ReadSingle(), qw = r.ReadSingle(); r.ReadBoolean();
+            // yaw from quaternion (Unity: y-up, left-handed)
+            hostYaw = (float)Math.Atan2(2 * (qw * qy + qx * qz), 1 - 2 * (qy * qy + qx * qx));
+            if (!haveHostPose) Console.WriteLine($"<- first pose from player {id} at ({hx:0.##}, {hy:0.##}, {hz:0.##})");
+            haveHostPose = true;
+            break;
+        }
         default: Console.WriteLine($"<- unknown message type {type}"); break;
     }
 };
@@ -122,6 +139,27 @@ while (true)
     {
         Console.WriteLine($"   [5s] rx {rxValues} control values, {rxTurret} turret states | turret {turretLine}");
         rxValues = rxTurret = 0; stats.Restart();
+    }
+    if (poseMode != null && host != null && poseClock.Elapsed.TotalSeconds >= nextPose)
+    {
+        nextPose = poseClock.Elapsed.TotalSeconds + 1.0 / 15;
+        float t = (float)poseClock.Elapsed.TotalSeconds;
+        float px, pz, yaw;
+        if (poseMode == "walk")
+        {
+            float ang = t * 0.6f; // rad/s around the circle
+            px = cx + radius * (float)Math.Sin(ang); pz = cz + radius * (float)Math.Cos(ang);
+            yaw = ang + (float)Math.PI / 2; // face along the path
+        }
+        else
+        {
+            px = cx + 1.5f * (float)Math.Sin(hostYawAtStart); pz = cz + 1.5f * (float)Math.Cos(hostYawAtStart);
+            yaw = hostYawAtStart + (float)Math.PI; // look back at the host
+        }
+        float qy = (float)Math.Sin(yaw / 2), qw = (float)Math.Cos(yaw / 2);
+        using var ms = new MemoryStream();
+        using (var w = new BinaryWriter(ms)) { w.Write(PlayerPose); w.Write(-1); w.Write(px); w.Write(cy); w.Write(pz); w.Write(0f); w.Write(qy); w.Write(0f); w.Write(qw); w.Write(false); }
+        host.Send(ms.ToArray(), DeliveryMethod.Sequenced);
     }
     if (dragId != null && host != null)
     {
@@ -161,6 +199,15 @@ while (true)
                 if (controlIds.Count == 0) Console.WriteLine("  none yet (the host sends them when you join)");
                 break;
             case "turret": Console.WriteLine("  turret " + turretLine); break;
+            case "walk":
+            case "stand":
+                if (!haveHostPose) { Console.WriteLine("no host pose yet"); break; }
+                cx = hx; cy = hy; cz = hz; hostYawAtStart = hostYaw;
+                radius = parts[0] == "walk" && parts.Length > 1 && float.TryParse(parts[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float rr) ? rr : 2f;
+                poseMode = parts[0];
+                Console.WriteLine(poseMode == "walk" ? $"walking a {radius} m circle around ({cx:0.##}, {cy:0.##}, {cz:0.##})" : "standing in front of the host");
+                break;
+            case "still": poseMode = null; Console.WriteLine("stopped sending pose"); break;
             case "mission":
             {
                 if (host == null) { Console.WriteLine("not connected"); break; }
@@ -185,7 +232,7 @@ while (true)
                 else Console.WriteLine("usage: drag <n> <delta> [seconds]  (see controls)");
                 break;
             }
-            default: Console.WriteLine("commands: list | again | send <n> | press <id> | reload <n> <i> | controls | drag <n> <delta> [s] | turret | mission <p> | quit"); break;
+            default: Console.WriteLine("commands: list | again | send <n> | press <id> | reload <n> <i> | controls | drag <n> <delta> [s] | turret | mission <p> | walk [r] | stand | still | quit"); break;
         }
     }
     Thread.Sleep(15);

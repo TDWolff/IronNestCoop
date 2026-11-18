@@ -9,14 +9,14 @@ namespace NestCoop;
 public class Mod : MelonMod
 {
     /// <summary>Also part of the network connection key: different versions refuse to connect.</summary>
-    public const string Version = "0.5.0";
+    public const string Version = "0.6.0";
 
     internal static MelonLogger.Instance Log;
     internal static MelonPreferences_Entry<bool> DebugLog;
     internal static MelonPreferences_Entry<bool> ReconOnSceneLoad, ProbeTurret;
     internal static MelonPreferences_Entry<string> ReplayKey, MissionReplayKey, HostKey, JoinKey, LeaveKey, JoinAddress;
-    internal static MelonPreferences_Entry<int> Port, SyncHz, TurretHz;
-    internal static MelonPreferences_Entry<float> TurretSnapDegrees;
+    internal static MelonPreferences_Entry<int> Port, SyncHz, TurretHz, PoseHz;
+    internal static MelonPreferences_Entry<float> TurretSnapDegrees, AvatarTimeout;
 
     public override void OnInitializeMelon()
     {
@@ -34,6 +34,8 @@ public class Mod : MelonMod
         Port = cat.CreateEntry("Port", 27960, description: "UDP port for co-op.");
         SyncHz = cat.CreateEntry("SyncHz", 20, description: "How often dragged wheel/lever values are sent (per second).");
         TurretHz = cat.CreateEntry("TurretHz", 10, description: "How often the host sends turret angle and gun elevations (per second).");
+        PoseHz = cat.CreateEntry("PoseHz", 15, description: "How often your player position/look is sent (per second).");
+        AvatarTimeout = cat.CreateEntry("AvatarTimeout", 5f, description: "Remove a remote player's avatar after this many seconds without an update.");
         TurretSnapDegrees = cat.CreateEntry("TurretSnapDegrees", 5f, description: "Guest snaps to the host turret angle when further off than this; smaller errors are blended.");
         Log.Msg($"NestCoop {Version} loaded. Host={HostKey.Value} Join={JoinKey.Value} Leave={LeaveKey.Value} Replay={ReplayKey.Value}");
     }
@@ -50,6 +52,7 @@ public class Mod : MelonMod
         DebugKeys.Update();
         Net.Poll();
         ControlSync.Update();
+        Avatars.Update();
     }
 
     public override void OnGUI() => Overlay.Draw();

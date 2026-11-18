@@ -276,3 +276,20 @@ draggables (spawned at runtime — will need `MissionSaveIdentity` instead).
   `StartOperation(Base_Campaign, Hospital False Flag)` from the main menu → tutorial 1 loaded and
   `GenerateMission seed=42872608` matched the original run. Still untested with a real guest: MissionGate blocking and
   applying BrowsingMap/MainMenu/FinishMission.
+
+## Milestone 7: player avatars (2026-11-17, v0.6.0) — built, untested
+
+- Recon: `FirstPersonController` (root object) has `cameraRoot` (head/look), `yaw`, `pitch`, `isCrouched`,
+  `controller` (CharacterController), moving-platform support. Unity proxies keep `GameObject.CreatePrimitive`,
+  `Shader.Find`, `Material.SetColor`, `Object.DontDestroyOnLoad`.
+- `Avatars.cs`: everyone sends feet position + `cameraRoot` rotation + crouch at `PoseHz` (15) unreliable; the host
+  stamps the sender's peer id and relays (host = player 0), so nobody gets their own pose back. Placeholder: capsule
+  body, sphere head, black visor for look direction, colour per player, no colliders, `DontDestroyOnLoad`; smoothed
+  toward the latest pose; removed on leave / session stop / `AvatarTimeout` (5 s) without updates.
+- World-space positions in Master Turret Scene; relies on turret angles matching (M5).
+- FakePeer `walk [r]` / `stand` / `still` acts as a visible remote player around the host.
+- **M7 test (log):** URP Lit shader found ✅; avatar created on first pose, exactly 2.0 m from the host for `walk` ✅;
+  removed after `still` (timed out) ✅, re-created, removed when FakePeer quit (left) ✅. Visual check by the user pending.
+- **M7 visual check ✅:** capsule looked right and faced correctly. It clipped through objects during FakePeer `walk`,
+  expected: FakePeer moves in a perfect circle ignoring walls. Real players send positions from their own
+  CharacterController, so they can't walk through walls.

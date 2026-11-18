@@ -45,6 +45,7 @@
     <Reference Include="UnityEngine.IMGUIModule"><HintPath>$(Il2CppAsm)\UnityEngine.IMGUIModule.dll</HintPath></Reference>
     <Reference Include="UnityEngine.InputLegacyModule"><HintPath>$(Il2CppAsm)\UnityEngine.InputLegacyModule.dll</HintPath></Reference>
     <Reference Include="Unity.InputSystem"><HintPath>$(Il2CppAsm)\Unity.InputSystem.dll</HintPath></Reference>
+    <Reference Include="UnityEngine.PhysicsModule"><HintPath>$(Il2CppAsm)\UnityEngine.PhysicsModule.dll</HintPath></Reference>
     <Reference Include="UnityEngine.CoreModule"><HintPath>$(Il2CppAsm)\UnityEngine.CoreModule.dll</HintPath></Reference>
   </ItemGroup>
 

@@ -13,6 +13,7 @@ internal enum MsgType : byte
     ControlGrab = 4,   // string id, bool grabbed, float v  (dragger → host → others) reliable
     MissionState = 6,  // byte phase, string operationId, string missionId, int seed (host → guests, join snapshot)
     MissionEvent = 7,  // byte kind (1 = FinishMission)                         (host → guests)
+    PlayerPose = 8,    // int playerId, 3×float feet, 4×float head rotation, bool crouched (unreliable; host relays)
     TurretState = 5,   // float angle, float desired, float velocity, int n, n×float gunElevation (host → guests)
 }
 
@@ -89,6 +90,7 @@ internal static class Net
         peers.Clear();
         ControlSync.Reset();
         MissionSync.Reset();
+        Avatars.Reset();
         t.Stop();
     }
 
@@ -107,6 +109,7 @@ internal static class Net
         {
             peers.Remove(id);
             ControlSync.OnPeerLeft(id);
+            Avatars.OnPeerLeft(id);
             Say(Role == Role.Guest ? $"Host left ({reason})" : $"Guest #{id} left ({reason})");
             if (Role == Role.Guest) Stop("lost host");
         };
@@ -233,6 +236,9 @@ internal static class Net
                 case MsgType.ControlGrab:
                 case MsgType.TurretState:
                     ControlSync.Handle(type, from, r, data);
+                    break;
+                case MsgType.PlayerPose:
+                    Avatars.Handle(from, r);
                     break;
                 case MsgType.MissionState:
                 case MsgType.MissionEvent:
