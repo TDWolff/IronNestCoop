@@ -414,3 +414,35 @@ draggables (spawned at runtime — will need `MissionSaveIdentity` instead).
 - **Esc / ` behaviour (user request):** Esc with the co-op menu open closes only the co-op menu (prefix on
   `HandleActionStarted` returns false, so the Esc menu doesn't open); Esc otherwise is untouched. ` with the Esc menu
   open closes only the Esc menu; the next ` opens the co-op menu. ` with the co-op menu open closes it.
+
+## 0.9.0: checkpoint snapshot + host-authoritative combat (2026-11-17) — built, untested in-game
+
+- **Checkpoint recon:** `MissionSaveManager.Instance.Capture(MissionManager, contentHash) → MissionSaveData`
+  (MissionState, FireMission, Economy, Stats, CounterBattery, Pressure, Replay, Turret, Graphs, Punchcards,
+  Teleprinters, DynamicMapObjects, FireMissionCards, MapTokens, MapMarkers, NotepadSections, BallisticCalculator,
+  **RandomStateJson**). Hash: `MissionCheckpointFingerprint.TryGetCurrentHash(mission, out hash)`. Files are written by
+  `ProgressionSaveUtility` (Newtonsoft JSON with its static `JsonSettings`, compress, XOR, hash; `.checkpoint`).
+  Load path: `MissionManager.StartOperation(op, mission, checkpoint)` / `LoadMission(mission, forceReload, checkpoint)`.
+- `Snapshot.cs`: host serializes with `Il2CppNewtonsoft.Json.JsonConvert.SerializeObject(data, ProgressionSaveUtility.JsonSettings)`
+  (non-generic overloads), gzips, sends `MissionCheckpoint`; guest `DeserializeObject(json, Il2CppType.Of<MissionSaveData>(), settings)`
+  and loads it via the game's resume path. Sent on mid-mission join, after host resume/reload (MissionState carries a
+  "checkpoint follows" flag so guests wait), on guest "Resync from host", and every `ResyncMinutes` (0 = off).
+  Local test: `CheckpointTestKey` (]) captures and reloads through the guest path.
+- **Combat recon:** `GunController.FireShell()`; `MapEntity` {ID, State (MapEntityStates: None 0, Destroyed 1, Damaged 2,
+  Moving 64, Hidden 128, Suppressed 1024, State1..5), Health, Armour}; `FireMission.Instance.Entities`
+  (Dictionary<string, MapEntity>), `TryGetMapEntity`, `SetEntityState`; `TurretController.MoveTurret(Vector3, bool)`
+  (tactical-map position); `ValveController.Damage/DamageValve/GetDamage01/SetDamage01`.
+- `Combat.cs`: on guests, FireShell / SetEntityState / Damage / DamageValve run only for host messages, and MoveTurret
+  becomes a request to the host. Host broadcasts ShellFired, EntityState (on change + 1 s diff), TurretMove, ValveDamage.
+- Release fixes: DebugLog off by default, debug keys gated, Registry miss rescans ≤ 1/s, MaxPlayers (FULL reject),
+  one player per control, CHANGELOG/README, website_url. Two-player checklist: `docs/steam-test-plan.md`.
+- **0.9.0 local check 1 ✅ (] round trip ×4, tutorial 1):** capture 40–44 KB JSON → 5 KB gzip; Newtonsoft parse with
+  the game's settings OK; `LoadMission(mission, true, checkpoint)` → game log `[MissionSave] Restored
+  'Base_Campaign/Hospital False Flag' at 9.16s / 33.15s / 64.16s / 90.48s` (mission clock carried over). Game-side
+  warnings during `FireMission.RestoreMissionState → Resources.LoadAll` ("referenced script is missing",
+  "different serialization layout") come from the game's own asset loading, not from NestCoop.
+  User confirmed visually: loaded shell, loaded charges/reload state and turret angle all survived the restore.
+  Checks 2 (FakePeer resync) and 3 (combat messages) not run yet.
+- **0.9.0 checks 2–3 ✅ (FakePeer):** on join mid-mission the host captured and sent the checkpoint
+  (`Snapshot: sent 'Hospital False Flag' to guest #1`, FakePeer saved a 41 KB JSON); firing broadcast
+  `Combat: host fired gun 0`. Entity-state traffic not observed in tutorial 1 (no enemy state changes happened).

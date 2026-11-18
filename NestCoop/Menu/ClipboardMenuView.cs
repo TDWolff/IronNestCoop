@@ -134,6 +134,7 @@ internal sealed class ClipboardMenuView : IMenuView
         else
         {
             items.Add(("Leave session", CoopMenu.Leave));
+            if (CoopMenu.Role == Role.Guest) items.Add(("Resync from host", CoopMenu.Resync));
             foreach (var (_, name) in CoopMenu.Peers.Take(4)) items.Add(($"• {name}", null));
         }
         items.Add((CoopMenu.DebugLog ? "Debug log: On" : "Debug log: Off", () => CoopMenu.DebugLog = !CoopMenu.DebugLog));

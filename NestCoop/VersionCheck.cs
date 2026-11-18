@@ -27,6 +27,13 @@ internal static class VersionCheck
         }
     }
 
+    /// <summary>Reject payload meaning "session is full" (sent instead of the host key).</summary>
+    public const string Full = "NestCoop|FULL";
+
+    public static string ExplainReject(string payload) => payload == Full
+        ? "The session is full (host's MaxPlayers)."
+        : Explain(payload);
+
     public static bool LooksLikeNestCoop(string k) => k != null && (k.StartsWith(Prefix) || k.StartsWith("NestCoop-"));
 
     /// <summary>Human-readable explanation of why <paramref name="hostKey"/> and ours don't match.</summary>

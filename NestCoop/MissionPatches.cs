@@ -30,14 +30,26 @@ static class MM_StartOperation2
 [HarmonyPatch(typeof(MissionManager), nameof(MissionManager.StartOperation), new[] { typeof(OperationGraph), typeof(MissionGraph), typeof(MissionSaveData) })]
 static class MM_StartOperation3
 {
-    static bool Prefix() { if (!MissionGate.Allow("StartOperation")) return false; MissionSync.BeforeLocalMissionLoad(); return true; }
+    static bool Prefix(MissionSaveData checkpoint)
+    {
+        if (!MissionGate.Allow("StartOperation")) return false;
+        MissionSync.BeforeLocalMissionLoad();
+        if (checkpoint != null) MissionSync.NoteHostResuming("starting from a checkpoint");
+        return true;
+    }
     static void Postfix() { PatchLog.Hit("MissionManager.StartOperation(op, mission, checkpoint)"); MissionSync.OnMissionManagerChanged("StartOperation+checkpoint"); }
 }
 
 [HarmonyPatch(typeof(MissionManager), nameof(MissionManager.ResumeOperation))]
 static class MM_ResumeOperation
 {
-    static bool Prefix() { if (!MissionGate.Allow("ResumeOperation")) return false; MissionSync.BeforeLocalMissionLoad(); return true; }
+    static bool Prefix()
+    {
+        if (!MissionGate.Allow("ResumeOperation")) return false;
+        MissionSync.BeforeLocalMissionLoad();
+        MissionSync.NoteHostResuming("resuming an operation");
+        return true;
+    }
     static void Postfix() { PatchLog.Hit("MissionManager.ResumeOperation"); MissionSync.OnMissionManagerChanged("ResumeOperation"); }
 }
 
@@ -51,7 +63,12 @@ static class MM_LoadMission_Sync
 [HarmonyPatch(typeof(MissionManager), nameof(MissionManager.ReloadCurrentMission))]
 static class MM_ReloadCurrentMission
 {
-    static bool Prefix() => MissionGate.Allow("ReloadCurrentMission");
+    static bool Prefix()
+    {
+        if (!MissionGate.Allow("ReloadCurrentMission")) return false;
+        MissionSync.NoteHostResuming("reloading the mission");
+        return true;
+    }
     static void Postfix() { PatchLog.Hit("MissionManager.ReloadCurrentMission"); MissionSync.OnMissionManagerChanged("ReloadCurrentMission"); }
 }
 

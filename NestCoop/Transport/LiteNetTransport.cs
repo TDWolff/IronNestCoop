@@ -33,7 +33,11 @@ internal sealed class LiteNetTransport : ITransport
         {
             string theirs = null;
             try { theirs = req.Data.GetString(); } catch { }
-            if (theirs == this.connectionKey) { req.Accept(); return; }
+            if (theirs == this.connectionKey)
+            {
+                if (idOf.Count + 1 >= Mod.MaxPlayers.Value) { req.Reject(System.Text.Encoding.UTF8.GetBytes(VersionCheck.Full)); Mod.Log.Msg("Net: rejected a joiner (session full)"); return; }
+                req.Accept(); return;
+            }
             Mod.Log.Warning($"Net: rejected a connection with key '{theirs}' (ours '{this.connectionKey}')");
             if (VersionCheck.LooksLikeNestCoop(theirs)) req.Reject(System.Text.Encoding.UTF8.GetBytes(this.connectionKey));
             else req.Reject();
@@ -52,7 +56,7 @@ internal sealed class LiteNetTransport : ITransport
                 // Never connected: this was our join attempt failing.
                 string why = info.Reason.ToString();
                 if (info.Reason == DisconnectReason.ConnectionRejected && info.AdditionalData != null && info.AdditionalData.AvailableBytes > 0)
-                    why = VersionCheck.Explain(System.Text.Encoding.UTF8.GetString(info.AdditionalData.GetRemainingBytes()));
+                    why = VersionCheck.ExplainReject(System.Text.Encoding.UTF8.GetString(info.AdditionalData.GetRemainingBytes()));
                 else why = Friendly(info.Reason);
                 ConnectFailed?.Invoke(why);
                 return;

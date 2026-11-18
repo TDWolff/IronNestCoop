@@ -1,0 +1,23 @@
+# Changelog
+
+## 0.9.0
+- **Mission state from the host:** guests receive the host's full mission checkpoint (objectives, map, messages,
+  punchcards, enemies) when they join mid-mission and periodically to correct drift, using the game's own
+  checkpoint system.
+- **Host-authoritative combat:** only the host's game fires shells and decides hits; guests see the host's shots.
+- **Turret position** is synced along with its rotation.
+- **One player per control:** a wheel or lever someone is holding can't be grabbed by another player.
+- **Session limit:** `MaxPlayers` (default 4); extra joiners are told the session is full.
+- Debug logging and debug keys are now off by default.
+
+## 0.8.0
+- Version check: both players need the same NestCoop version and game build; a mismatch says exactly what differs.
+- Clear disconnect messages; a player who leaves disappears immediately for everyone.
+- Co-op runs are kept off the leaderboards (the game's own opt-out); solo runs still count.
+
+## 0.7.0
+- Steam friends transport (no port forwarding), co-op menu in the game's own clipboard style (` key),
+  NestCoop Terminal on the safe box by the computer desk, Esc/` menu handling.
+
+## 0.6.0 and earlier
+- Player avatars, mission flow with a shared mission seed, wheel/lever/turret sync, button and reload sync.

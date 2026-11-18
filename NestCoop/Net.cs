@@ -13,6 +13,12 @@ internal enum MsgType : byte
     ControlGrab = 4,   // string id, bool grabbed, float v  (dragger → host → others) reliable
     MissionState = 6,  // byte phase, string operationId, string missionId, int seed (host → guests, join snapshot)
     MissionEvent = 7,  // byte kind (1 = FinishMission)                         (host → guests)
+    MissionCheckpoint = 10, // string op, string mission, int seed, int len, gzip(JSON MissionSaveData)  (host → guest)
+    ResyncRequest = 11,     // (empty)                                                             (guest → host)
+    ShellFired = 12,        // int gunIndex                                                        (host → guests)
+    EntityState = 13,       // string entityId, int state, int health, int armour                  (host → guests)
+    TurretMove = 14,        // 3×float worldPos, bool dodge          (guest → host request; host → guests)
+    ValveDamage = 15,       // string valveId, float damage01                                      (host → guests)
     PlayerLeft = 9,    // int playerId                                         (host → guests)
     PlayerPose = 8,    // int playerId, 3×float feet, 4×float head rotation, bool crouched (unreliable; host relays)
     TurretState = 5,   // float angle, float desired, float velocity, int n, n×float gunElevation (host → guests)
@@ -107,6 +113,7 @@ internal static class Net
         peers.Clear();
         ControlSync.Reset();
         MissionSync.Reset();
+        Combat.Reset();
         Avatars.Reset();
         t.Stop();
     }
@@ -129,7 +136,7 @@ internal static class Net
         {
             peers.Add(id);
             if (Role == Role.Guest) { hostPeer = id; Say("Connected to host"); }
-            else { Say($"Guest #{id} joined"); MissionSync.SendSnapshot(id); SendSnapshot(id); ControlSync.SendSnapshot(id); }
+            else { Say($"Guest #{id} joined"); Combat.OnGuestJoined(); MissionSync.SendSnapshot(id); SendSnapshot(id); ControlSync.SendSnapshot(id); }
         };
         t.PeerDisconnected += (id, reason) =>
         {
@@ -275,6 +282,16 @@ internal static class Net
                 case MsgType.ControlGrab:
                 case MsgType.TurretState:
                     ControlSync.Handle(type, from, r, data);
+                    break;
+                case MsgType.MissionCheckpoint:
+                case MsgType.ResyncRequest:
+                    Snapshot.Handle(type, from, r);
+                    break;
+                case MsgType.ShellFired:
+                case MsgType.EntityState:
+                case MsgType.TurretMove:
+                case MsgType.ValveDamage:
+                    Combat.Handle(type, from, r);
                     break;
                 case MsgType.PlayerLeft:
                 {

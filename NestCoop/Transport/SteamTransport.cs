@@ -151,6 +151,11 @@ internal sealed class SteamTransport : ITransport
                     SendControl(from, Ctl.Reject, key); // our key: the guest explains the difference
                     break;
                 }
+                if (!idOf.ContainsKey(from) && idOf.Count + 1 >= Mod.MaxPlayers.Value)
+                {
+                    SendControl(from, Ctl.Reject, VersionCheck.Full);
+                    break;
+                }
                 SendControl(from, Ctl.Welcome, "");
                 if (!idOf.ContainsKey(from)) AddPeer(from);
                 break;
@@ -159,7 +164,7 @@ internal sealed class SteamTransport : ITransport
                 break;
             case Ctl.Reject when !isHost && from == target:
                 Mod.Log.Warning($"Steam: host rejected us: {text}");
-                ConnectFailed?.Invoke(VersionCheck.LooksLikeNestCoop(text) ? VersionCheck.Explain(text) : $"Host rejected: {text}");
+                ConnectFailed?.Invoke(VersionCheck.LooksLikeNestCoop(text) ? VersionCheck.ExplainReject(text) : $"Host rejected: {text}");
                 Stop();
                 break;
             case Ctl.Bye:

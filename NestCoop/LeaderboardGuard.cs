@@ -62,5 +62,9 @@ static class Leaderboard_SteamSubmit
 [HarmonyPatch(typeof(MissionManager), nameof(MissionManager.StartMissionRuntime))]
 static class Leaderboard_RunStart
 {
-    static void Postfix() => LeaderboardGuard.OnMissionRuntimeStarted();
+    static void Postfix()
+    {
+        LeaderboardGuard.OnMissionRuntimeStarted();
+        MissionSync.OnMissionRuntimeStarted();
+    }
 }

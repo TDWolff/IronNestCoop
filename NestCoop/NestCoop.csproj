@@ -50,6 +50,7 @@
     <Reference Include="UnityEngine.UI"><HintPath>$(Il2CppAsm)\UnityEngine.UI.dll</HintPath></Reference>
     <Reference Include="Unity.TextMeshPro"><HintPath>$(Il2CppAsm)\Unity.TextMeshPro.dll</HintPath></Reference>
     <Reference Include="UnityEngine.UIModule"><HintPath>$(Il2CppAsm)\UnityEngine.UIModule.dll</HintPath></Reference>
+    <Reference Include="Il2CppNewtonsoft.Json"><HintPath>$(Il2CppAsm)\Il2CppNewtonsoft.Json.dll</HintPath></Reference>
     <Reference Include="UnityEngine.CoreModule"><HintPath>$(Il2CppAsm)\UnityEngine.CoreModule.dll</HintPath></Reference>
   </ItemGroup>
 
@@ -96,7 +97,7 @@
     <RemoveDir Directories="$(PkgStage)" />
     <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(PkgStage)\Mods" />
     <Copy SourceFiles="$(PkgLiteNetLib)\lib\netstandard2.1\LiteNetLib.dll" DestinationFolder="$(PkgStage)\UserLibs" />
-    <Copy SourceFiles="$(PackagingDir)\README.md;$(PackagingDir)\icon.png" DestinationFolder="$(PkgStage)" />
+    <Copy SourceFiles="$(PackagingDir)\README.md;$(PackagingDir)\CHANGELOG.md;$(PackagingDir)\icon.png" DestinationFolder="$(PkgStage)" />
     <!-- Thunderstore rejects a manifest.json with a UTF-8 BOM, so write it with .NET's BOM-less UTF-8. -->
     <WriteLinesToFile File="$(PkgStage)\manifest.json" Lines="$(ManifestJson)" Overwrite="true" Encoding="utf-8" WriteOnlyWhenDifferent="false" />
     <Exec Command="powershell -NoProfile -Command &quot;$p='$(PkgStage)\manifest.json'; $t=[IO.File]::ReadAllText($p); [IO.File]::WriteAllText($p, $t, (New-Object Text.UTF8Encoding $false))&quot;" />

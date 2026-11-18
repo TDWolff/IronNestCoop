@@ -20,13 +20,14 @@ internal static class DebugKeys
     public static void Update()
     {
         if (Pressed(Mod.MenuKey.Value)) Menu.CoopMenu.Toggle();
-        if (Pressed(Mod.UiDumpKey.Value)) { try { UiDump.Run(); } catch (Exception e) { Mod.Log.Error($"UI dump failed: {e}"); } }
+        if (Mod.DebugLog.Value && Pressed(Mod.UiDumpKey.Value)) { try { UiDump.Run(); } catch (Exception e) { Mod.Log.Error($"UI dump failed: {e}"); } }
         if (Pressed(Mod.HostKey.Value)) Net.StartHost();
         if (Pressed(Mod.JoinKey.Value)) Net.Join();
         if (Pressed(Mod.LeaveKey.Value)) Net.Stop("leave key");
         if (Mod.DebugLog.Value && Pressed(Mod.ReplayKey.Value)) ReplayLastPress();
         if (Mod.DebugLog.Value && Pressed(Mod.MissionReplayKey.Value)) MissionSync.DebugReplay();
-        if (Pressed(Mod.SteamCheckKey.Value)) SteamCheck();
+        if (Mod.DebugLog.Value && Pressed(Mod.CheckpointTestKey.Value)) Snapshot.DebugRoundTrip();
+        if (Mod.DebugLog.Value && Pressed(Mod.SteamCheckKey.Value)) SteamCheck();
     }
 
     /// <summary>True on the frame the named key goes down (Input System; legacy Input proved unnecessary).</summary>

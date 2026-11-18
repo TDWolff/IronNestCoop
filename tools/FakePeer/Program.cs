@@ -16,6 +16,7 @@
 //   walk [radius]   be a visible player: walk in a circle (default 2 m) around where the host stands now
 //   stand           stand 1.5 m in front of the host, looking at them
 //   still           stop sending a pose (the avatar should vanish after AvatarTimeout)
+//   resync          ask the host for its full mission checkpoint (host must be in a mission)
 //   quit
 // Protocol must match NestCoop/Net.cs (connection key "NestCoop-<version>", BinaryWriter encoding):
 //   1 ButtonPress:  string id, int32 malfunction
@@ -24,6 +25,12 @@
 //   4 ControlGrab:  string id, bool grabbed, float value
 //   6 MissionState: byte phase, string operationId, string missionId, int32 seed
 //   7 MissionEvent: byte kind (1 = FinishMission)
+//  10 MissionCheckpoint: string op, string mission, int32 seed, int32 len, len bytes gzip(JSON)
+//  11 ResyncRequest:     (empty)
+//  12 ShellFired:        int32 gunIndex
+//  13 EntityState:       string id, int32 state, int32 health, int32 armour
+//  14 TurretMove:        3 x float worldPos, bool dodge
+//  15 ValveDamage:       string valveId, float damage01
 //   9 PlayerLeft:   int32 playerId
 //   8 PlayerPose:   int32 playerId, 3 x float feet, 4 x float head rotation (x,y,z,w), bool crouched (unreliable)
 //   5 TurretState:  float angle, float desired, float velocity, int32 n, n x float gunElevation (unreliable)
@@ -34,7 +41,7 @@ string address = args.Length > 0 ? args[0] : "127.0.0.1";
 int port = args.Length > 1 ? int.Parse(args[1]) : 27960;
 // Key format (M9): "NestCoop|<mod version>|<game build>". FakePeer can't know the game build, so it connects with a
 // placeholder, gets REJECTED with the host's key (that exercises the version-mismatch path), then reconnects with it.
-string version = args.Length > 2 ? args[2] : "0.8.0";
+string version = args.Length > 2 ? args[2] : "0.9.0";
 string key = args.Length > 3 ? args[3] : $"NestCoop|{version}|fakepeer";
 bool retriedWithHostKey = false;
 
@@ -43,6 +50,7 @@ float hx = 0, hy = 0, hz = 0, hostYaw = 0, hostYawAtStart = 0; bool haveHostPose
 string poseMode = null; float cx = 0, cy = 0, cz = 0, radius = 2f;
 var poseClock = System.Diagnostics.Stopwatch.StartNew(); double nextPose = 0;
 string lastOp = "", lastMission = "";
+int entityMsgs = 0;
 var controlIds = new List<string>();
 var controlValues = new Dictionary<string, float>();
 string turretLine = "(none yet)";
@@ -59,7 +67,7 @@ NetPeer host = null;
 var listener = new EventBasedNetListener();
 var manager = new NetManager(listener) { AutoRecycle = true, DisconnectTimeout = 10000 };
 
-listener.PeerConnectedEvent += p => { host = p; Console.WriteLine("[connected to host] commands: list | again | send <n> | press <id> | reload <n> <i> | controls | drag <n> <delta> [s] | turret | mission <p> | walk [r] | stand | still | quit"); };
+listener.PeerConnectedEvent += p => { host = p; Console.WriteLine("[connected to host] commands: list | again | send <n> | press <id> | reload <n> <i> | controls | drag <n> <delta> [s] | turret | mission <p> | walk [r] | stand | still | resync | quit"); };
 listener.PeerDisconnectedEvent += (p, info) =>
 {
     host = null;
@@ -126,6 +134,27 @@ listener.NetworkReceiveEvent += (p, reader, ch, method) =>
         case MissionEvent:
             Console.WriteLine($"<- mission event {(r.ReadByte() == 1 ? "FinishMission" : "?")}");
             break;
+        case 10: // MissionCheckpoint
+        {
+            string op = r.ReadString(), mis = r.ReadString(); int seed = r.ReadInt32(); int len = r.ReadInt32(); var gz = r.ReadBytes(len);
+            string json;
+            using (var g = new System.IO.Compression.GZipStream(new MemoryStream(gz), System.IO.Compression.CompressionMode.Decompress))
+            using (var sr = new StreamReader(g)) json = sr.ReadToEnd();
+            Console.WriteLine($"<- CHECKPOINT op='{op}' mission='{mis}' seed={seed}: {len / 1024} KB gzip, {json.Length / 1024} KB JSON, starts {json[..Math.Min(80, json.Length)]}");
+            File.WriteAllText("fakepeer-checkpoint.json", json);
+            Console.WriteLine("   (saved as fakepeer-checkpoint.json)");
+            break;
+        }
+        case 12: Console.WriteLine($"<- shell fired by gun {r.ReadInt32()}"); break;
+        case 13:
+        {
+            string id = r.ReadString(); int st = r.ReadInt32(), hp = r.ReadInt32(), ar = r.ReadInt32();
+            entityMsgs++;
+            if (st != 0 || entityMsgs <= 5) Console.WriteLine($"<- entity {id}: state {st}, health {hp}, armour {ar}");
+            break;
+        }
+        case 14: Console.WriteLine($"<- turret move to ({r.ReadSingle():0.#}, {r.ReadSingle():0.#}, {r.ReadSingle():0.#}) dodge={r.ReadBoolean()}"); break;
+        case 15: { string id = r.ReadString(); float d = r.ReadSingle(); if (d > 0.001f) Console.WriteLine($"<- valve {Short(id)} damage {d:0.00}"); break; }
         case 9: // PlayerLeft
             Console.WriteLine($"<- player {r.ReadInt32()} left");
             break;
@@ -217,6 +246,11 @@ while (true)
                 if (controlIds.Count == 0) Console.WriteLine("  none yet (the host sends them when you join)");
                 break;
             case "turret": Console.WriteLine("  turret " + turretLine); break;
+            case "resync":
+                if (host == null) { Console.WriteLine("not connected"); break; }
+                host.Send(new byte[] { 11 }, DeliveryMethod.ReliableOrdered);
+                Console.WriteLine("-> resync request");
+                break;
             case "walk":
             case "stand":
                 if (!haveHostPose) { Console.WriteLine("no host pose yet"); break; }
@@ -250,7 +284,7 @@ while (true)
                 else Console.WriteLine("usage: drag <n> <delta> [seconds]  (see controls)");
                 break;
             }
-            default: Console.WriteLine("commands: list | again | send <n> | press <id> | reload <n> <i> | controls | drag <n> <delta> [s] | turret | mission <p> | walk [r] | stand | still | quit"); break;
+            default: Console.WriteLine("commands: list | again | send <n> | press <id> | reload <n> <i> | controls | drag <n> <delta> [s] | turret | mission <p> | walk [r] | stand | still | resync | quit"); break;
         }
     }
     Thread.Sleep(15);

@@ -135,6 +135,10 @@ internal static class ControlSync
         if (Mod.DebugLog.Value) Mod.Log.Msg($"ControlSync: {(grabbed ? "grab" : "release")} {id} = {v:0.###}");
     }
 
+    /// <summary>Host: is this control held by the host itself or by a different guest than <paramref name="peer"/>?</summary>
+    static bool HeldByOther(Control c, int peer) =>
+        c.Dragging || (heldBy.TryGetValue(c.Id, out int owner) && owner != peer);
+
     public static void OnPeerLeft(int peer)
     {
         foreach (var id in heldBy.Where(kv => kv.Value == peer).Select(kv => kv.Key).ToList())
@@ -259,6 +263,7 @@ internal static class ControlSync
                 float v = r.ReadSingle();
                 var c = Find(id);
                 if (c == null) { Mod.Log.Warning($"ControlSync: unknown/non-shared control {id}"); return; }
+                if (Net.Role == Role.Host && HeldByOther(c, from)) return; // someone else has it
                 if (IsTraverseWheel(c)) { OnRemoteTraverseValue(v); if (Net.Role == Role.Host) { heldBy.TryAdd(id, from); c.LastSent = v; Net.Broadcast(raw, reliable: false, exceptPeer: from); } return; }
                 if (Net.Role == Role.Host)
                 {
@@ -277,6 +282,12 @@ internal static class ControlSync
                 float v = r.ReadSingle();
                 var c = Find(id);
                 if (c == null) return;
+                if (Net.Role == Role.Host && grabbed && HeldByOther(c, from))
+                {
+                    Mod.Log.Msg($"ControlSync: guest #{from} tried to grab {id}, already held");
+                    return;
+                }
+                if (Net.Role == Role.Host && !grabbed && heldBy.TryGetValue(id, out int owner) && owner != from) return; // not theirs
                 bool traverse = IsTraverseWheel(c);
                 if (traverse) OnRemoteTraverseValue(v);
                 if (Net.Role == Role.Host)

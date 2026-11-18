@@ -9,23 +9,24 @@ namespace NestCoop;
 public class Mod : MelonMod
 {
     /// <summary>Also part of the network connection key: different versions refuse to connect.</summary>
-    public const string Version = "0.8.0";
+    public const string Version = "0.9.0";
 
     internal static MelonLogger.Instance Log;
     internal static MelonPreferences_Entry<bool> DebugLog;
     internal static MelonPreferences_Entry<bool> ReconOnSceneLoad, ProbeTurret, TerminalEnabled;
-    internal static MelonPreferences_Entry<string> ReplayKey, MissionReplayKey, HostKey, JoinKey, LeaveKey, JoinAddress, TransportName, SteamJoinTarget, SteamCheckKey, MenuKey, UiDumpKey, MenuStyle;
-    internal static MelonPreferences_Entry<int> Port, SyncHz, TurretHz, PoseHz;
+    internal static MelonPreferences_Entry<string> ReplayKey, MissionReplayKey, HostKey, JoinKey, LeaveKey, JoinAddress, TransportName, SteamJoinTarget, SteamCheckKey, MenuKey, UiDumpKey, MenuStyle, CheckpointTestKey;
+    internal static MelonPreferences_Entry<int> Port, SyncHz, TurretHz, PoseHz, MaxPlayers, ResyncMinutes;
     internal static MelonPreferences_Entry<float> TurretSnapDegrees, AvatarTimeout;
 
     public override void OnInitializeMelon()
     {
         Log = LoggerInstance;
         var cat = MelonPreferences.CreateCategory("NestCoop");
-        DebugLog = cat.CreateEntry("DebugLog", true, description: "Log first hit of every Harmony patch, scene loads, network messages.");
+        DebugLog = cat.CreateEntry("DebugLog", false, description: "Log first hit of every Harmony patch, scene loads, network messages.");
         ReconOnSceneLoad = cat.CreateEntry("ReconOnSceneLoad", false, description: "Write UserData/NestCoop/recon/<scene>.txt listing controls and what they drive.");
         ProbeTurret = cat.CreateEntry("ProbeTurret", false, description: "Debug: log traverse wheel + turret internals while the wheel is dragged.");
         ReplayKey = cat.CreateEntry("ReplayKey", "Backslash", description: "Debug: replays your last button press as if it came from the network. Unity key name, e.g. Backslash, Insert, F9.");
+        CheckpointTestKey = cat.CreateEntry("CheckpointTestKey", "RightBracket", description: "Debug: capture the current mission and reload it through the guest checkpoint path (local test). Needs DebugLog.");
         MissionReplayKey = cat.CreateEntry("MissionReplayKey", "Insert", description: "Debug: re-apply the last started mission through the guest code path (local test of mission sync).");
         HostKey = cat.CreateEntry("HostKey", "Home", description: "Start hosting a co-op session.");
         JoinKey = cat.CreateEntry("JoinKey", "End", description: "Join the host at JoinAddress:Port.");
@@ -41,6 +42,8 @@ public class Mod : MelonMod
         Port = cat.CreateEntry("Port", 27960, description: "UDP port for co-op.");
         SyncHz = cat.CreateEntry("SyncHz", 20, description: "How often dragged wheel/lever values are sent (per second).");
         TurretHz = cat.CreateEntry("TurretHz", 10, description: "How often the host sends turret angle and gun elevations (per second).");
+        ResyncMinutes = cat.CreateEntry("ResyncMinutes", 0, description: "Host: send everyone the full mission state every N minutes to correct drift (reloads the mission scene on guests). 0 = off; guests can use Resync from host in the menu.");
+        MaxPlayers = cat.CreateEntry("MaxPlayers", 4, description: "Host: most players in a session, including the host. Extra joiners are told the session is full.");
         PoseHz = cat.CreateEntry("PoseHz", 15, description: "How often your player position/look is sent (per second).");
         AvatarTimeout = cat.CreateEntry("AvatarTimeout", 5f, description: "Remove a remote player's avatar after this many seconds without an update.");
         TurretSnapDegrees = cat.CreateEntry("TurretSnapDegrees", 5f, description: "Guest snaps to the host turret angle when further off than this; smaller errors are blended.");
@@ -61,6 +64,8 @@ public class Mod : MelonMod
         ControlSync.Update();
         Avatars.Update();
         LeaderboardGuard.Update();
+        Snapshot.Update();
+        Combat.Update();
         Menu.CoopMenu.Update();
         Terminal.Update();
     }

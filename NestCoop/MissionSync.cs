@@ -95,6 +95,8 @@ internal static class MissionSync
     {
         var s = Current();
         if (s == null) return;
+        // Mid-mission join: send the full checkpoint instead, so the guest gets enemies, objectives and progress.
+        if (s.Value.Phase == MissionManager.GamePhase.MissionActive && Snapshot.SendTo(peer)) return;
         Net.SendTo(peer, WriteState(s.Value), reliable: true);
         Mod.Log.Msg($"MissionSync: sent state to guest #{peer}: {s.Value}");
     }
@@ -110,7 +112,48 @@ internal static class MissionSync
     static byte[] WriteState(State st) => Net.Write(MsgType.MissionState, w =>
     {
         w.Write((byte)st.Phase); w.Write(st.Op); w.Write(st.Mission); w.Write(st.Seed);
+        w.Write(hostResuming && st.Phase == MissionManager.GamePhase.MissionActive); // checkpoint follows: guests wait for it
     });
+
+    // ---------------- host resume / reload → checkpoint (0.9.0) ----------------
+
+    static bool hostResuming;
+
+    /// <summary>Host is starting a mission from a checkpoint (resume) or reloading: guests get the checkpoint, not a fresh run.</summary>
+    public static void NoteHostResuming(string why)
+    {
+        if (Net.Role != Role.Host || Net.ApplyingRemote) return;
+        hostResuming = true;
+        Mod.Log.Msg($"MissionSync: host {why} — guests will get the checkpoint");
+    }
+
+    /// <summary>MissionManager.StartMissionRuntime finished.</summary>
+    public static void OnMissionRuntimeStarted()
+    {
+        if (!hostResuming) return;
+        hostResuming = false;
+        Snapshot.BroadcastSoon();
+    }
+
+    /// <summary>Guest: load the host's checkpoint through the game's own resume path.</summary>
+    public static void ApplyCheckpoint(string opId, string missionId, int seed, MissionSaveData data)
+    {
+        var mm = MissionManager.Instance;
+        if (mm == null) return;
+        var mission = FindMission(missionId);
+        if (mission == null) { Mod.Log.Error($"MissionSync: mission '{missionId}' not found on this machine"); return; }
+        var op = FindOperation(opId);
+        PendingSeed = seed; HasPendingSeed = seed != 0;
+        WaitingForCheckpoint = false;
+        bool inThatMission = mm.CurrentPhase == MissionManager.GamePhase.MissionActive && mm.CurrentMission?.MissionID == missionId;
+        if (!inThatMission && op != null && mm.CurrentOperation?.OperationID != opId)
+            Run($"StartOperation({opId}, {missionId}, host checkpoint)", m => m.StartOperation(op, mission, data));
+        else
+            Run($"LoadMission({missionId}, host checkpoint)", m => m.LoadMission(mission, true, data));
+    }
+
+    /// <summary>Guest: the host is resuming and its checkpoint hasn't arrived yet.</summary>
+    public static bool WaitingForCheckpoint;
 
     // ---------------- Receive ----------------
 
@@ -119,7 +162,9 @@ internal static class MissionSync
         if (type == MsgType.MissionState)
         {
             var st = new State((MissionManager.GamePhase)r.ReadByte(), r.ReadString(), r.ReadString(), r.ReadInt32());
+            bool checkpointFollows = r.BaseStream.Position < r.BaseStream.Length && r.ReadBoolean();
             if (Net.Role != Role.Guest) { Mod.Log.Warning($"MissionSync: ignored mission state from a guest ({st})"); return; }
+            if (checkpointFollows) { WaitingForCheckpoint = true; Mod.Log.Msg($"MissionSync: host is resuming {st.Mission}; waiting for its checkpoint"); Overlay.Toast("Host is loading a checkpoint…"); return; }
             Apply(st, "host");
         }
         else if (type == MsgType.MissionEvent)
