@@ -33,6 +33,24 @@ Release package (`dist/TDWolff-NestCoop-<version>.zip`, importable in r2modman):
 dotnet build NestCoop -c Release -t:Package
 ```
 
+## Releasing
+1. Bump `Version` in `NestCoop/Mod.cs` (semantic versioning; below 1.0 = pre-release) and add a `## <version>` section
+   to `packaging/CHANGELOG.md`. Commit and push `main`.
+2. Check, then prepare the release (package, SHA-256, notes, annotated tag `v<version>`):
+   ```bash
+   powershell -ExecutionPolicy Bypass -File tools/release.ps1 -DryRun
+   ```
+   ```bash
+   powershell -ExecutionPolicy Bypass -File tools/release.ps1 -Push
+   ```
+3. Publish the GitHub Release with the command the script prints (`gh release create …`), or on github.com:
+   Releases → Draft a new release → pick the tag → paste `dist/release-notes-<version>.md` → attach the zip and
+   `.sha256` → tick pre-release while below 1.0.
+
+The script refuses to run on a dirty tree, off `main`, with unpushed commits, without a changelog section, or if the
+tag already exists. Releases are built locally because the build needs the game's IL2CPP proxy assemblies, which
+can't (and mustn't) be on GitHub. Never move a published tag — release a new version instead.
+
 ## Testing without a second copy
 Host in-game (Home, or the ` menu with Network: Localhost), then:
 ```bash
