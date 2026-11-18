@@ -293,3 +293,20 @@ draggables (spawned at runtime — will need `MissionSaveIdentity` instead).
 - **M7 visual check ✅:** capsule looked right and faced correctly. It clipped through objects during FakePeer `walk`,
   expected: FakePeer moves in a perfect circle ignoring walls. Real players send positions from their own
   CharacterController, so they can't walk through walls.
+
+## Milestone 8: Steam transport (2026-11-17, v0.7.0) — built, untested
+
+- Recon: the shipped `Plugins/x86_64/steam_api64.dll` exports the flat API we need: `SteamAPI_SteamNetworking_v006`,
+  `SteamAPI_SteamFriends_v018`, `SteamAPI_SteamUser_v023`, `SteamAPI_SteamUtils_v010`, `ISteamNetworking_SendP2PPacket /
+  IsP2PPacketAvailable / ReadP2PPacket / AcceptP2PSessionWithUser / CloseP2PSessionWithUser`, `ISteamFriends_GetFriendCount /
+  GetFriendByIndex / GetFriendGamePlayed / GetFriendPersonaName / GetPersonaName`, `ISteamUser_GetSteamID`,
+  `ISteamUtils_GetAppID`, `SteamAPI_IsSteamRunning`. (Listed with a small PE export parser.)
+- `Transport/SteamApi.cs`: P/Invoke into that DLL (not the IL2CPP Steamworks.NET proxies, which may be stripped).
+- `Transport/SteamTransport.cs`: friends-only, no lobbies/callbacks, all polled. Guest sends Hello(key) to a friend in
+  IRON NEST (`SteamJoinTarget` name/SteamID64 or first found); host AcceptP2PSessionWithUser's every friend in the game
+  every 2 s and answers Welcome/Reject (version check). Ping 1 s, drop after 10 s silence, Bye on stop.
+- Settings: `Transport` = LiteNetLib (default, FakePeer) | Steam; `SteamJoinTarget`; `SteamCheckKey` (PageUp) logs
+  Steam identity + friends in game locally. Steam can't P2P to yourself → full test needs a friend who owns the game.
+- **M8 local check ✅:** PageUp → `Steam check: OK as <name> (<SteamID>), app 2950790. Friends in IRON NEST: none` —
+  P/Invoke into the game's steam_api64.dll works (interfaces, SteamID, AppID, friend scan). P2P session untested
+  (needs a friend who owns the game).

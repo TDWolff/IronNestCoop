@@ -65,18 +65,19 @@ internal static class Net
     {
         if (Active) { Say($"Already {Role}"); return; }
         transport = CreateTransport();
-        if (!transport.Host(Mod.Port.Value)) { Say($"Could not host on port {Mod.Port.Value} (in use?)"); transport = null; return; }
+        if (!transport.Host(Mod.Port.Value)) { Say(UseSteam ? "Could not host via Steam (see log)" : $"Could not host on port {Mod.Port.Value} (in use?)"); transport = null; return; }
         Role = Role.Host;
-        Say($"Hosting on localhost:{Mod.Port.Value}");
+        Say(UseSteam ? "Hosting via Steam (friends can join)" : $"Hosting on localhost:{Mod.Port.Value}");
     }
 
     public static void Join()
     {
         if (Active) { Say($"Already {Role}"); return; }
         transport = CreateTransport();
-        if (!transport.Connect(Mod.JoinAddress.Value, Mod.Port.Value)) { Say("Join failed to start"); transport = null; return; }
+        string address = UseSteam ? Mod.SteamJoinTarget.Value : Mod.JoinAddress.Value;
+        if (!transport.Connect(address, Mod.Port.Value)) { Say("Join failed to start"); transport = null; return; }
         Role = Role.Guest;
-        Say($"Joining {Mod.JoinAddress.Value}:{Mod.Port.Value} ...");
+        if (!UseSteam) Say($"Joining {address}:{Mod.Port.Value} ...");
     }
 
     public static void Stop(string why)
@@ -94,11 +95,19 @@ internal static class Net
         t.Stop();
     }
 
-    public static void Poll() => transport?.Poll();
+    public static void Poll()
+    {
+        if (transport == null) return;
+        transport.Poll();
+        // A transport can give up on its own (Steam: host rejected us / never answered).
+        if (transport != null && !transport.IsRunning) Stop("connection closed");
+    }
+
+    static bool UseSteam => string.Equals(Mod.TransportName.Value, "Steam", StringComparison.OrdinalIgnoreCase);
 
     static ITransport CreateTransport()
     {
-        var t = new LiteNetTransport(ConnectionKey);
+        ITransport t = UseSteam ? new SteamTransport(ConnectionKey) : new LiteNetTransport(ConnectionKey);
         t.PeerConnected += id =>
         {
             peers.Add(id);

@@ -24,6 +24,7 @@ internal static class DebugKeys
         if (Pressed(Mod.LeaveKey.Value)) Net.Stop("leave key");
         if (Mod.DebugLog.Value && Pressed(Mod.ReplayKey.Value)) ReplayLastPress();
         if (Mod.DebugLog.Value && Pressed(Mod.MissionReplayKey.Value)) MissionSync.DebugReplay();
+        if (Pressed(Mod.SteamCheckKey.Value)) SteamCheck();
     }
 
     /// <summary>True on the frame the named key goes down (Input System; legacy Input proved unnecessary).</summary>
@@ -45,6 +46,17 @@ internal static class DebugKeys
             if (!loggedNoKeyboard) { loggedNoKeyboard = true; Mod.Log.Warning($"DebugKeys: Input System read failed: {e.Message}"); }
             return false;
         }
+    }
+
+    /// <summary>Local Steam test (P2P with yourself is impossible): can we reach steam_api64, who are we, who's in game.</summary>
+    static void SteamCheck()
+    {
+        if (!Transport.SteamApi.Init(out var why)) { Mod.Log.Warning($"Steam check: {why}"); Overlay.Toast($"Steam: {why}"); return; }
+        var friends = Transport.SteamApi.FriendsInThisGame();
+        string me = $"{Transport.SteamApi.MyName} ({Transport.SteamApi.MySteamId}), app {Transport.SteamApi.AppId}";
+        string list = friends.Count == 0 ? "none" : string.Join(", ", friends.Select(f => $"{f.name} ({f.id})"));
+        Mod.Log.Msg($"Steam check: OK as {me}. Friends in IRON NEST: {list}");
+        Overlay.Toast($"Steam OK: {Transport.SteamApi.MyName}. Friends in game: {friends.Count}", 6f);
     }
 
     static void ReplayLastPress()
