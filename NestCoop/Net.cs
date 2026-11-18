@@ -95,6 +95,7 @@ internal static class Net
         transport = CreateTransport();
         if (!transport.Host(Mod.Port.Value)) { Say(UseSteam ? "Could not host via Steam (see log)" : $"Could not host on port {Mod.Port.Value} (in use?)"); transport = null; return; }
         Role = Role.Host;
+        LogSaver.OnSessionStarted(Role.Host);
         Say(UseSteam ? "Hosting via Steam (friends can join)" : $"Hosting on localhost:{Mod.Port.Value}");
     }
 
@@ -106,6 +107,7 @@ internal static class Net
         string address = target ?? (UseSteam ? Mod.SteamJoinTarget.Value : Mod.JoinAddress.Value);
         if (!transport.Connect(address, Mod.Port.Value)) { Say("Join failed to start"); transport = null; return; }
         Role = Role.Guest;
+        LogSaver.OnSessionStarted(Role.Guest);
         if (!UseSteam) Say($"Joining {address}:{Mod.Port.Value} ...");
     }
 
@@ -114,6 +116,7 @@ internal static class Net
     {
         if (transport == null) return;
         if (quiet) Mod.Log.Msg($"Net: stopped ({why})"); else Say($"Disconnected ({why})");
+        LogSaver.NotePlayers(Peers);
         var t = transport;
         transport = null;   // first, so nothing can send during teardown
         Role = Role.None;
@@ -125,6 +128,7 @@ internal static class Net
         CoopPause.Reset();
         Avatars.Reset();
         t.Stop();
+        LogSaver.OnSessionEnded(why);
     }
 
     public static void Poll()

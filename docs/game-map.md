@@ -477,3 +477,4 @@ draggables (spawned at runtime — will need `MissionSaveIdentity` instead).
   menu "Invite Steam friends" opens Steam's invite dialog; a game launched with the token auto-joins at the main menu.
   Limit: Steam launching a non-running game skips r2modman's MelonLoader args; accepting while running fires a Steam
   callback that isn't hooked — the reliable path is the friend starting via r2modman and using "Join <name>".
+- **0.9.5:** `LogSaver.cs` copies `MelonLoader/Latest.log` (shared read) to `UserData/NestCoop/logs/<start>_<role>_v<ver>.log` with a header when a session ends (Net.Stop, incl. quit and failed joins); keeps 20. ML itself keeps only `max_logs = 10` launches in MelonLoader/Logs.

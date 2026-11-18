@@ -49,5 +49,9 @@ and the guest is told exactly what differs.
 - Leaderboards: any run that had a co-op session is automatically kept off the leaderboards (the game's own opt-out is
   switched on for that run). Solo runs with the mod installed still count.
 
+## Reporting problems
+Every co-op session saves its log automatically to `UserData/NestCoop/logs/` in your r2modman profile
+(Settings → Browse profile folder). Send the file from around the time it happened.
+
 ## Uninstall
 Remove it in r2modman. It doesn't change any game files.

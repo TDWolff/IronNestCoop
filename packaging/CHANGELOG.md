@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.5
+- **Session logs are saved automatically:** when a co-op session ends (leave, disconnect, failed join, or quitting
+  during a session) a copy of the log goes to `UserData/NestCoop/logs/` with a short header (versions, role,
+  players). The last 20 are kept, so a test session's log is never lost.
+
 ## 0.9.4
 - **Smoother remote controls:** wheels and levers turned by another player glide instead of stepping.
 - **Ping over Steam:** shown next to each player in the co-op menu and in the guest's status line.
