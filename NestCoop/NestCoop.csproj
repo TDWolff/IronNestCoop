@@ -55,6 +55,11 @@
     <Reference Include="UnityEngine.CoreModule"><HintPath>$(Il2CppAsm)\UnityEngine.CoreModule.dll</HintPath></Reference>
   </ItemGroup>
 
+  <!-- Avatar head model (art/export_avatar.py writes it), read by AvatarModel.cs. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Assets\avatar-head.mesh.txt" LogicalName="NestCoop.avatar-head.mesh.txt" />
+  </ItemGroup>
+
   <!-- Milestone 3 transport (localhost testing). Deployed to the profile's UserLibs/ by DeployToProfile. -->
   <ItemGroup>
     <PackageReference Include="LiteNetLib" Version="2.1.5" GeneratePathProperty="true" />

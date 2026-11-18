@@ -9,8 +9,9 @@ namespace NestCoop;
 /// Every machine sends its own pose (feet position, head rotation, crouch) at PoseHz, unreliable. Guests send to the
 /// host; the host stamps the sender's peer id and relays to the other guests, and sends its own pose as player 0.
 /// Nobody ever receives their own pose, so a guest doesn't need to know its own id.
-/// Receivers draw a placeholder per player — capsule body, sphere head, dark "visor" showing look direction — and
-/// smooth toward the latest pose. Avatars are removed when the player leaves, the session stops, or after
+/// Receivers draw a floating head per player (0.9.8: AvatarModel, a helmet band in the player's colour, plus a dark
+/// shadow disc on the floor; falls back to the old capsule + sphere if the model can't load) and smooth toward the
+/// latest pose. Avatars are removed when the player leaves, the session stops, or after
 /// AvatarTimeout seconds without a pose.
 ///
 /// Positions are world space in the Master Turret Scene. That's fine while turret angles match (host-authoritative,
@@ -24,7 +25,8 @@ internal static class Avatars
 
     sealed class Avatar
     {
-        public GameObject Root, Body, Head;
+        public GameObject Root, Body, Head; // Body: capsule fallback only (null with the head model)
+        public GameObject Shadow;           // head model only; placed on the floor below by raycast
         public Il2CppTMPro.TextMeshPro Label;
         public Color Color;
         public Vector3 TargetFeet;
@@ -110,12 +112,28 @@ internal static class Avatars
             UnityEngine.Object.DontDestroyOnLoad(root);
             var color = ColorFor(id);
 
-            var body = Part(PrimitiveType.Capsule, root.transform, new Vector3(0, 0.9f, 0), new Vector3(0.5f, 0.9f, 0.5f), color);
-            var head = Part(PrimitiveType.Sphere, root.transform, new Vector3(0, 1.65f, 0), new Vector3(0.3f, 0.3f, 0.3f), color);
-            // Visor: a dark slab on the front of the head, so you can see where they're looking.
-            Part(PrimitiveType.Cube, head.transform, new Vector3(0, 0.05f, 0.42f), new Vector3(0.8f, 0.3f, 0.3f), Color.black);
+            GameObject body = null, head, shadow = null;
+            head = new GameObject("Head");
+            head.transform.SetParent(root.transform, false);
+            head.transform.localPosition = new Vector3(0, 1.65f, 0);
+            head.transform.localScale = Vector3.one * HeadScale;
+            if (AvatarModel.Build(head.transform, color, MakeMaterial))
+            {
+                // Shadow under the floating head so it reads as standing somewhere.
+                // Shadow on the floor under the floating head. The pose position is the player's body centre, not the
+                // feet, so the floor is found by a raycast each frame (PlaceShadow).
+                shadow = Part(PrimitiveType.Cylinder, root.transform, Vector3.zero, new Vector3(0.45f, 0.004f, 0.45f), new Color(0.04f, 0.04f, 0.04f));
+            }
+            else
+            {
+                UnityEngine.Object.Destroy(head);
+                body = Part(PrimitiveType.Capsule, root.transform, new Vector3(0, 0.9f, 0), new Vector3(0.5f, 0.9f, 0.5f), color);
+                head = Part(PrimitiveType.Sphere, root.transform, new Vector3(0, 1.65f, 0), new Vector3(0.3f, 0.3f, 0.3f), color);
+                // Visor: a dark slab on the front of the head, so you can see where they're looking.
+                Part(PrimitiveType.Cube, head.transform, new Vector3(0, 0.05f, 0.42f), new Vector3(0.8f, 0.3f, 0.3f), Color.black);
+            }
 
-            a = new Avatar { Root = root, Body = body, Head = head, Color = color };
+            a = new Avatar { Root = root, Body = body, Head = head, Shadow = shadow, Color = color };
             ApplyName(a, id);
             avatars[id] = a;
             Mod.Log.Msg($"Avatars: created avatar for player {id}");
@@ -143,23 +161,45 @@ internal static class Avatars
         return go;
     }
 
+    /// <summary>The head model is life-size (23 cm); a bit bigger reads better across the cockpit.</summary>
+    const float HeadScale = 1.25f;
+
     static Shader litShader;
     static bool shaderLookedUp;
+
+    static Shader LitShader()
+    {
+        if (!shaderLookedUp)
+        {
+            shaderLookedUp = true;
+            litShader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Standard");
+            Mod.Log.Msg($"Avatars: shader {(litShader != null ? litShader.name : "not found")}");
+        }
+        return litShader;
+    }
+
+    /// <summary>A lit material in <paramref name="color"/> (URP property names, plus built-in fallbacks).</summary>
+    static Material MakeMaterial(Color color, float metallic, float smoothness)
+    {
+        var mat = new Material(LitShader());
+        mat.SetColor("_BaseColor", color); // URP
+        mat.SetColor("_Color", color);     // built-in fallback
+        mat.SetFloat("_Metallic", metallic);
+        mat.SetFloat("_Smoothness", smoothness);
+        mat.SetFloat("_Glossiness", smoothness);
+        return mat;
+    }
 
     static void Tint(GameObject go, Color color)
     {
         var rend = go.GetComponent<Renderer>();
         if (rend == null) return;
-        if (!shaderLookedUp)
+        if (LitShader() == null)
         {
-            shaderLookedUp = true;
-            litShader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Universal Render Pipeline/Unlit");
-            Mod.Log.Msg($"Avatars: shader {(litShader != null ? litShader.name : "not found, using primitive default")}");
+            rend.material.SetColor("_Color", color);
+            return;
         }
-        var mat = litShader != null ? new Material(litShader) : rend.material;
-        mat.SetColor("_BaseColor", color); // URP
-        mat.SetColor("_Color", color);     // built-in fallback
-        rend.material = mat;
+        rend.material = MakeMaterial(color, 0f, 0.2f);
     }
 
     static Color ColorFor(int id) => (id % 6) switch
@@ -188,12 +228,16 @@ internal static class Avatars
             {
                 // Name tag: above the head, always facing this player's camera (TMP reads from -Z).
                 var lt = a.Label.transform;
-                lt.localPosition = new Vector3(0, a.Crouched ? 1.6f : 2.1f, 0);
+                lt.localPosition = new Vector3(0, EyeHeight(a.Crouched) + 0.35f, 0);
                 lt.rotation = Quaternion.LookRotation(lt.position - cam.transform.position);
             }
-            float bodyY = a.Crouched ? 0.6f : 0.9f;
-            a.Body.transform.localScale = new Vector3(0.5f, bodyY, 0.5f);
-            a.Body.transform.localPosition = new Vector3(0, bodyY, 0);
+            PlaceShadow(a);
+            if (a.Body != null)
+            {
+                float bodyY = a.Crouched ? 0.6f : 0.9f;
+                a.Body.transform.localScale = new Vector3(0.5f, bodyY, 0.5f);
+                a.Body.transform.localPosition = new Vector3(0, bodyY, 0);
+            }
         }
         if (stale != null) foreach (var id in stale) Remove(id, "timed out");
     }
@@ -204,7 +248,40 @@ internal static class Avatars
         var yawOnly = Quaternion.Euler(0, a.TargetHead.eulerAngles.y, 0);
         a.Root.transform.rotation = Quaternion.Slerp(a.Root.transform.rotation, yawOnly, t);
         a.Head.transform.rotation = Quaternion.Slerp(a.Head.transform.rotation, a.TargetHead, t);
-        a.Head.transform.localPosition = new Vector3(0, a.Crouched ? 1.15f : 1.65f, 0);
+        a.Head.transform.localPosition = new Vector3(0, EyeHeight(a.Crouched), 0);
+    }
+
+    /// <summary>Put the shadow on whatever is below the player (floor, stairs, turret deck); hide it if nothing is.</summary>
+    static void PlaceShadow(Avatar a)
+    {
+        if (a.Shadow == null) return;
+        var from = a.Root.transform.position + Vector3.up * 0.1f;
+        if (Physics.Raycast(from, Vector3.down, out RaycastHit hit, 3f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+        {
+            if (!a.Shadow.activeSelf) a.Shadow.SetActive(true);
+            a.Shadow.transform.position = hit.point + Vector3.up * 0.01f;
+        }
+        else if (a.Shadow.activeSelf) a.Shadow.SetActive(false);
+    }
+
+    // Eye height above the pose position (the player's body centre), measured from our own player (everyone uses the same FirstPersonController, so the
+    // remote players' cameras sit at the same height). Defaults until measured: the 0.9.7 guesses.
+    static float standEye = 1.65f, crouchEye = 1.15f;
+    static bool loggedStand, loggedCrouch;
+
+    static float EyeHeight(bool crouched)
+    {
+        var p = Player();
+        if (p != null && p.cameraRoot != null)
+        {
+            float h = p.cameraRoot.position.y - p.transform.position.y;
+            if (h > 0.3f && h < 2.5f)
+            {
+                if (p.isCrouched) { crouchEye = h; if (!loggedCrouch) { loggedCrouch = true; Mod.Log.Msg($"Avatars: crouched eye height {h:0.00} m"); } }
+                else { standEye = h; if (!loggedStand) { loggedStand = true; Mod.Log.Msg($"Avatars: standing eye height {h:0.00} m"); } }
+            }
+        }
+        return crouched ? crouchEye : standEye;
     }
 
     // ---------------- Names ----------------

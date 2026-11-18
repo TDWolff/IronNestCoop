@@ -6,3 +6,6 @@ Directory.Build.props.user
 dump/
 dist/
 fakepeer-checkpoint.json
+
+# Blender backups
+*.blend1

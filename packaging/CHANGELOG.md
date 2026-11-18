@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+- **Players are floating crew heads** instead of capsules: a tanker helmet with goggles, with the helmet band in the
+  player's colour, turning and tilting with where they look, and a shadow on the floor where they stand. Heads sit at
+  the game's real eye height (measured from your own player).
+
 ## 0.9.7
 - **Shift+Tab opens only the Steam overlay:** Tab still raises and lowers your clipboard, but not while Shift is held.
 - The co-op menu drops **Join first friend**: on Steam it lists each friend playing IRON NEST as *Join <name>*
