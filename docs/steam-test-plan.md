@@ -1,12 +1,12 @@
-# Two-player Steam test plan (NestCoop 0.9.9)
+# Two-player Steam test plan (NestCoop 0.9.10)
 
 Everything below can only be checked with **two PCs and two Steam accounts that both own IRON NEST** (the game won't
 run twice on one PC, and Steam can't connect you to yourself). Tick items off as you go; after the session, send the
 saved session logs from **both** profiles: `UserData/NestCoop/logs/` (saved automatically when a session ends).
 
 ## Setup (both players)
-- [ ] Same game build (log line `NestCoop 0.9.9 loaded (key NestCoop|0.9.9|<game build>)` must show the same key).
-- [ ] Import `TDWolff-NestCoop-0.9.9.zip` in r2modman (Settings → Import local mod) into a **fresh** profile.
+- [ ] Same game build (log line `NestCoop 0.9.10 loaded (key NestCoop|0.9.10|<game build>)` must show the same key).
+- [ ] Import `TDWolff-NestCoop-0.9.10.zip` in r2modman (Settings → Import local mod) into a **fresh** profile.
 - [ ] Launch once, quit, set in `UserData/MelonPreferences.cfg` under `[NestCoop]`:
       `Transport = "Steam"` and `DebugLog = true` (for the test logs).
 - [ ] Be Steam friends; both in the game's main menu.

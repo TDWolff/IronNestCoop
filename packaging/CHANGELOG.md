@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.9.10
 - **Host can kick players:** in the co-op menu each guest has **Kick <name>** (click twice to confirm). They're told
   the host removed them, and over Steam they can't rejoin until the host stops hosting.
 
