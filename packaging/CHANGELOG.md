@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.2
+- A guest who picks **Return to Main Menu / Return to Map** in the Esc menu now leaves the co-op session and goes
+  back as normal (before, they were stuck with "Only the host can change missions").
+
 ## 0.9.1
 - **Co-op doesn't pause:** during a session, menus and alt-tab no longer freeze just your own game (that made the
   players' battles drift apart). Outside a session the game pauses as usual.

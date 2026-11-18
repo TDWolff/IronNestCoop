@@ -458,3 +458,5 @@ draggables (spawned at runtime — will need `MissionSaveIdentity` instead).
 - **0.9.1 pause check ✅ (hosting, localhost):** alt-tab → `OnApplicationFocus` skipped both ways (focus lost/regained),
   Esc menu → `RequestPause` skipped; battle kept running; after leaving the session Esc paused normally (no NestCoop
   lines). 48 Harmony patches, no errors. Win/fail and guest-malfunction changes need the two-player test.
+- **0.9.2:** guest-initiated `ReturnToMap` / `EndOperationAndReturnToMenu` (Esc menu) now leave the session first
+  (`MissionGate.AllowOrLeave`) and then run normally; other guest mission changes are still blocked.

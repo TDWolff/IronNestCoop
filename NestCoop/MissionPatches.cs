@@ -18,6 +18,19 @@ static class MissionGate
         Overlay.Toast("Only the host can change missions");
         return false;
     }
+
+    /// <summary>
+    /// A guest choosing "Return to Main Menu" / "Return to Map" wants to stop playing: leave the co-op session first,
+    /// then let the game go back as normal (0.9.2 — before, guests were stuck in the mission with "Only the host…").
+    /// </summary>
+    public static bool AllowOrLeave(string what)
+    {
+        if (Net.Role != Role.Guest || Net.ApplyingRemote) return true;
+        Mod.Log.Msg($"MissionGate: guest {what} — leaving the co-op session first");
+        Net.Stop("you left the mission", quiet: true);
+        Overlay.Toast("You left the co-op session", 6f);
+        return true;
+    }
 }
 
 [HarmonyPatch(typeof(MissionManager), nameof(MissionManager.StartOperation), new[] { typeof(OperationGraph), typeof(MissionGraph) })]
@@ -82,14 +95,14 @@ static class MM_EnterBrowsingMap
 [HarmonyPatch(typeof(MissionManager), nameof(MissionManager.ReturnToMap))]
 static class MM_ReturnToMap
 {
-    static bool Prefix() => MissionGate.Allow("ReturnToMap");
+    static bool Prefix() => MissionGate.AllowOrLeave("ReturnToMap");
     static void Postfix() { PatchLog.Hit("MissionManager.ReturnToMap"); MissionSync.OnMissionManagerChanged("ReturnToMap"); }
 }
 
 [HarmonyPatch(typeof(MissionManager), nameof(MissionManager.EndOperationAndReturnToMenu))]
 static class MM_EndOperationAndReturnToMenu
 {
-    static bool Prefix() => MissionGate.Allow("EndOperationAndReturnToMenu");
+    static bool Prefix() => MissionGate.AllowOrLeave("EndOperationAndReturnToMenu");
     static void Postfix() { PatchLog.Hit("MissionManager.EndOperationAndReturnToMenu"); MissionSync.OnMissionManagerChanged("EndOperationAndReturnToMenu"); }
 }
 
