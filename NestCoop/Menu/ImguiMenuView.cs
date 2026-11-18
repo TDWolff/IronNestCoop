@@ -76,10 +76,15 @@ internal sealed class ImguiMenuView : IMenuView
             bool steam = Toggle(Next(), CoopMenu.UsingSteam, CoopMenu.UsingSteam ? "Steam (play with friends)" : "Localhost (testing with FakePeer)");
             if (steam != CoopMenu.UsingSteam) CoopMenu.SetUseSteam(steam);
 
+            // Steam: joining is per friend (list below), so Host takes the whole row.
             var row = Next(32);
-            float bw = (w - Gap) / 2;
-            if (Button(new Rect(row.x, row.y, bw, row.height), "Host")) CoopMenu.Host();
-            if (Button(new Rect(row.x + bw + Gap, row.y, bw, row.height), CoopMenu.UsingSteam ? "Join first friend" : "Join localhost")) CoopMenu.Join();
+            if (CoopMenu.UsingSteam) { if (Button(row, "Host")) CoopMenu.Host(); }
+            else
+            {
+                float bw = (w - Gap) / 2;
+                if (Button(new Rect(row.x, row.y, bw, row.height), "Host")) CoopMenu.Host();
+                if (Button(new Rect(row.x + bw + Gap, row.y, bw, row.height), "Join localhost")) CoopMenu.Join();
+            }
         }
         else
         {

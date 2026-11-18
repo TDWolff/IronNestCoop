@@ -122,9 +122,10 @@ internal sealed class ClipboardMenuView : IMenuView
         if (!CoopMenu.Connected)
         {
             items.Add(("Host co-op", CoopMenu.Host));
-            items.Add((CoopMenu.UsingSteam ? "Join first friend" : "Join localhost", CoopMenu.Join));
-            if (CoopMenu.UsingSteam)
-                foreach (var f in CoopMenu.FriendsInGame.Take(3))
+            if (!CoopMenu.UsingSteam) items.Add(("Join localhost", CoopMenu.Join));
+            else if (CoopMenu.FriendsInGame.Count == 0) items.Add(("No friends in IRON NEST", null));
+            else
+                foreach (var f in CoopMenu.FriendsInGame.Take(4))
                 {
                     ulong id = f.id;
                     items.Add(($"Join {f.name}", () => CoopMenu.JoinFriend(id)));

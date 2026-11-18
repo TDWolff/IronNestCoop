@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.9.7
+- **Shift+Tab opens only the Steam overlay:** Tab still raises and lowers your clipboard, but not while Shift is held.
+- The co-op menu drops **Join first friend**: on Steam it lists each friend playing IRON NEST as *Join <name>*
+  (or says none are playing). Use *Invite Steam friends* or the Shift+Tab overlay to invite. The End key still joins
+  the first friend it finds.
+- Settings → Co-op: **Max players** and **Resync guests** now show up (as option pickers; the game's settings have
+  no number stepper, so they were missing in 0.9.6).
+- Player README updated for the Settings → Co-op tab and the current menu.
+
 ## 0.9.6
 - **Co-op tab in the game's Settings** (main menu and Esc menu): your name, network (Steam/Localhost), max players,
   resync interval, NestCoop Terminal on/off, co-op menu style and debug logging, in the game's own widgets.

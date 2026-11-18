@@ -9,7 +9,7 @@ namespace NestCoop;
 public class Mod : MelonMod
 {
     /// <summary>Also part of the network connection key: different versions refuse to connect.</summary>
-    public const string Version = "0.9.6";
+    public const string Version = "0.9.7";
 
     internal static MelonLogger.Instance Log;
     internal static MelonPreferences_Entry<bool> DebugLog;
@@ -70,6 +70,7 @@ public class Mod : MelonMod
         Menu.CoopMenu.Update();
         Terminal.Update();
         Menu.SettingsTab.Update();
+        ShiftTabGuard.Update();
     }
 
     public override void OnGUI()

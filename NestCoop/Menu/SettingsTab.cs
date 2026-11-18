@@ -34,7 +34,7 @@ internal static class SettingsTab
         public GameObject Panel;
         public TextfieldUGUI Name;
         public OptionsButtonUGUI Network, Style;
-        public StepperUGUI MaxPlayers, Resync;
+        public OptionsButtonUGUI MaxPlayers, Resync; // the game has no StepperUGUI in its settings: number pickers
         public ToggleUGUI Terminal, Debug;
     }
 
@@ -77,9 +77,8 @@ internal static class SettingsTab
         // Widget templates: first of each kind anywhere in this settings screen (inactive ones included).
         var tplToggle = settings.GetComponentsInChildren<ToggleUGUI>(true).FirstOrDefault();
         var tplOptions = settings.GetComponentsInChildren<OptionsButtonUGUI>(true).FirstOrDefault();
-        var tplStepper = settings.GetComponentsInChildren<StepperUGUI>(true).FirstOrDefault();
         var tplText = settings.GetComponentsInChildren<TextfieldUGUI>(true).FirstOrDefault();
-        Mod.Log.Msg($"SettingsTab: templates toggle={tplToggle != null} options={tplOptions != null} stepper={tplStepper != null} textfield={tplText != null}");
+        Mod.Log.Msg($"SettingsTab: templates toggle={tplToggle != null} options={tplOptions != null} textfield={tplText != null}");
 
         var holder = new GameObject("NestCoop SettingsTab Holder");
         holder.SetActive(false);
@@ -108,8 +107,8 @@ internal static class SettingsTab
             var t = new Tab { Panel = panel };
             if (tplText != null) t.Name = AddWidget<TextfieldUGUI>(tplText.gameObject, layout, "Your name (shown to other players)");
             if (tplOptions != null) t.Network = AddWidget<OptionsButtonUGUI>(tplOptions.gameObject, layout, "Network");
-            if (tplStepper != null) t.MaxPlayers = AddWidget<StepperUGUI>(tplStepper.gameObject, layout, "Max players (host)");
-            if (tplStepper != null) t.Resync = AddWidget<StepperUGUI>(tplStepper.gameObject, layout, "Resync guests every N min (0 = off)");
+            if (tplOptions != null) t.MaxPlayers = AddWidget<OptionsButtonUGUI>(tplOptions.gameObject, layout, "Max players (host)");
+            if (tplOptions != null) t.Resync = AddWidget<OptionsButtonUGUI>(tplOptions.gameObject, layout, "Resync guests (host)");
             if (tplToggle != null) t.Terminal = AddWidget<ToggleUGUI>(tplToggle.gameObject, layout, "Show the NestCoop Terminal");
             if (tplOptions != null) t.Style = AddWidget<OptionsButtonUGUI>(tplOptions.gameObject, layout, "Co-op menu style");
             if (tplToggle != null) t.Debug = AddWidget<ToggleUGUI>(tplToggle.gameObject, layout, "Debug logging");
@@ -219,13 +218,32 @@ internal static class SettingsTab
         return l.Cast<Il2CppSystem.Collections.Generic.IList<string>>();
     }
 
+    static readonly List<int> MaxPlayersValues = new() { 2, 3, 4, 5, 6, 7, 8 };
+    static readonly List<int> ResyncValues = new() { 0, 1, 2, 5, 10, 15, 30 };
+
+    /// <summary>A number picker: the list of values (plus the current one if it was set to something else in the cfg).</summary>
+    static void InitNumber(OptionsButtonUGUI o, List<int> values, int current, Func<int, string> label)
+    {
+        if (!values.Contains(current)) { values.Add(current); values.Sort(); }
+        o.SetOptions(Il2CppList(values.Select(label).ToArray()));
+        o.SelectedIndex = values.IndexOf(current);
+    }
+
+    /// <summary>The picked value if it differs from the setting, else null.</summary>
+    static int? PickedNumber(OptionsButtonUGUI o, List<int> values, int current)
+    {
+        int i = o.SelectedIndex;
+        if (i < 0 || i >= values.Count || values[i] == current) return null;
+        return values[i];
+    }
+
     static void Init(Tab t)
     {
         if (t.Name != null) t.Name.Text = Mod.PlayerName.Value;
         if (t.Network != null) { t.Network.SetOptions(Il2CppList(NetworkOptions)); t.Network.SelectedIndex = Net.UseSteam ? 0 : 1; }
         if (t.Style != null) { t.Style.SetOptions(Il2CppList(StyleOptions)); t.Style.SelectedIndex = IsGameStyle ? 0 : 1; }
-        if (t.MaxPlayers != null) { t.MaxPlayers.MinValue = 2; t.MaxPlayers.MaxValue = 8; t.MaxPlayers.Value = Mod.MaxPlayers.Value; }
-        if (t.Resync != null) { t.Resync.MinValue = 0; t.Resync.MaxValue = 30; t.Resync.Value = Mod.ResyncMinutes.Value; }
+        if (t.MaxPlayers != null) InitNumber(t.MaxPlayers, MaxPlayersValues, Mod.MaxPlayers.Value, v => v.ToString());
+        if (t.Resync != null) InitNumber(t.Resync, ResyncValues, Mod.ResyncMinutes.Value, v => v == 0 ? "Off" : $"Every {v} min");
         if (t.Terminal != null) t.Terminal.Value = Mod.TerminalEnabled.Value;
         if (t.Debug != null) t.Debug.Value = Mod.DebugLog.Value;
     }
@@ -251,8 +269,8 @@ internal static class SettingsTab
             }
         }
         if (t.Style != null && (t.Style.SelectedIndex == 0) != IsGameStyle) { Mod.MenuStyle.Value = t.Style.SelectedIndex == 0 ? "Game" : "Imgui"; changed = true; }
-        if (t.MaxPlayers != null && Mathf.RoundToInt(t.MaxPlayers.Value) != Mod.MaxPlayers.Value) { Mod.MaxPlayers.Value = Mathf.RoundToInt(t.MaxPlayers.Value); changed = true; }
-        if (t.Resync != null && Mathf.RoundToInt(t.Resync.Value) != Mod.ResyncMinutes.Value) { Mod.ResyncMinutes.Value = Mathf.RoundToInt(t.Resync.Value); changed = true; }
+        if (t.MaxPlayers != null && PickedNumber(t.MaxPlayers, MaxPlayersValues, Mod.MaxPlayers.Value) is int mp) { Mod.MaxPlayers.Value = mp; changed = true; }
+        if (t.Resync != null && PickedNumber(t.Resync, ResyncValues, Mod.ResyncMinutes.Value) is int rs) { Mod.ResyncMinutes.Value = rs; changed = true; }
         if (t.Terminal != null && t.Terminal.Value != Mod.TerminalEnabled.Value) { Mod.TerminalEnabled.Value = t.Terminal.Value; NestCoop.Terminal.ApplyEnabled(); changed = true; }
         if (t.Debug != null && t.Debug.Value != Mod.DebugLog.Value) { Mod.DebugLog.Value = t.Debug.Value; changed = true; }
         if (changed) MelonPreferences.Save();
