@@ -12,8 +12,10 @@
     3. Writes dist/TDWolff-NestCoop-<version>.zip.sha256 and dist/release-notes-<version>.md (changelog section +
        install instructions).
     4. Creates the annotated tag v<version> locally.
-  Nothing is pushed or published unless you pass -Push (pushes the tag). Publishing the GitHub Release is up to you:
-  the script prints the exact gh command and the website steps.
+    5. -Push pushes the tag; -Publish also creates the GitHub Release with the GitHub CLI (gh): zip + .sha256 attached,
+       notes from step 3, marked pre-release below 1.0.
+  Without -Publish the script prints the exact gh command and the website steps instead.
+  -PublishOnly publishes a tag that was already pushed (e.g. an earlier run without -Publish), from the files in dist/.
 
   The game's IL2CPP proxy DLLs are needed to build, which is why releases are built locally and not in CI.
 
@@ -23,14 +25,25 @@
 .PARAMETER Push
   Also push the tag to origin (creates nothing else on GitHub).
 
+.PARAMETER Publish
+  Push the tag and create the GitHub Release with gh (needs the GitHub CLI installed and `gh auth login` done once).
+  Checked before anything is built or tagged.
+
+.PARAMETER PublishOnly
+  Only create the GitHub Release for the existing tag v<version> from dist/ (no checks, build or tag).
+
 .EXAMPLE
   powershell -ExecutionPolicy Bypass -File tools/release.ps1 -DryRun
   powershell -ExecutionPolicy Bypass -File tools/release.ps1
   powershell -ExecutionPolicy Bypass -File tools/release.ps1 -Push
+  powershell -ExecutionPolicy Bypass -File tools/release.ps1 -Publish
+  powershell -ExecutionPolicy Bypass -File tools/release.ps1 -PublishOnly
 #>
 param(
     [switch]$DryRun,
-    [switch]$Push
+    [switch]$Push,
+    [switch]$Publish,
+    [switch]$PublishOnly
 )
 
 $ErrorActionPreference = 'Stop'
@@ -42,7 +55,7 @@ function Step([string]$msg) { Write-Host "== $msg" -ForegroundColor Cyan }
 function Invoke-GitChecked { & git @args; if ($LASTEXITCODE -ne 0) { Fail "git $($args -join ' ') failed" } }
 
 # ---------------------------------------------------------------- version
-$modCs = Get-Content -Raw 'NestCoop/Mod.cs'
+$modCs = Get-Content -Raw -Encoding UTF8 'NestCoop/Mod.cs'
 $m = [regex]::Match($modCs, 'Version = "(\d+\.\d+\.\d+)"')
 if (-not $m.Success) { Fail 'could not read Version = "x.y.z" from NestCoop/Mod.cs' }
 $version = $m.Groups[1].Value
@@ -50,7 +63,35 @@ $tag = "v$version"
 $zip = "dist/TDWolff-NestCoop-$version.zip"
 $sha = "$zip.sha256"
 $notesFile = "dist/release-notes-$version.md"
+$pre = ''
+if ($version.StartsWith('0.')) { $pre = ' --prerelease' }
 Write-Host "NestCoop $version (tag $tag)" -ForegroundColor Green
+if ($Publish) { $Push = $true }
+
+# GitHub CLI: installed and signed in (checked first, so nothing is tagged if publishing can't work).
+function Assert-Gh {
+    if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
+        Fail 'GitHub CLI (gh) not found - install it from https://cli.github.com, then run: gh auth login'
+    }
+    & gh auth status *> $null
+    if ($LASTEXITCODE -ne 0) { Fail 'gh is not signed in - run: gh auth login' }
+}
+
+function Publish-Release {
+    Step "GitHub Release $tag"
+    foreach ($f in @($zip, $sha, $notesFile)) { if (-not (Test-Path $f)) { Fail "$f missing - run the script without -PublishOnly first" } }
+    $ghArgs = @('release', 'create', $tag, $zip, $sha, '--title', "NestCoop $version", '--notes-file', $notesFile, '--verify-tag')
+    if ($pre) { $ghArgs += '--prerelease' }
+    & gh @ghArgs
+    if ($LASTEXITCODE -ne 0) { Fail 'gh release create failed (see above); the tag is pushed - fix it and rerun with -PublishOnly' }
+}
+
+if ($PublishOnly) {
+    Assert-Gh
+    Publish-Release
+    Write-Host "`nPublished $tag." -ForegroundColor Green
+    exit 0
+}
 
 # ---------------------------------------------------------------- checks
 Step 'Checks'
@@ -71,10 +112,11 @@ if (& git tag --list $tag) { Fail "tag $tag already exists locally - bump Mod.Ve
 $remoteTag = & git ls-remote --tags origin "refs/tags/$tag" 2>$null
 if ($remoteTag) { Fail "tag $tag already exists on origin - bump Mod.Version" }
 
-$changelog = Get-Content -Raw 'packaging/CHANGELOG.md'
+$changelog = Get-Content -Raw -Encoding UTF8 'packaging/CHANGELOG.md'
 $sec = [regex]::Match($changelog, "(?ms)^## $([regex]::Escape($version))\s*\r?\n(.*?)(?=^## |\z)")
 if (-not $sec.Success -or -not $sec.Groups[1].Value.Trim()) { Fail "packaging/CHANGELOG.md has no '## $version' section" }
-Write-Host '   clean tree, on main, pushed, tag free, changelog section found'
+if ($Publish -and -not $DryRun) { Assert-Gh }
+Write-Host "   clean tree, on main, pushed, tag free, changelog section found$(if ($Publish) {', gh ready'})"
 
 # ---------------------------------------------------------------- notes
 Step 'Release notes'
@@ -86,8 +128,8 @@ $($sec.Groups[1].Value.Trim())
 ## Install
 1. Install **r2modman** and pick IRON NEST: Heavy Turret Simulator (it installs MelonLoader).
 2. Download **TDWolff-NestCoop-$version.zip** below.
-3. r2modman → Settings → **Import local mod** → choose the zip.
-4. Start modded, quit once, then set ``Transport = "Steam"`` in ``UserData/MelonPreferences.cfg`` (``[NestCoop]``).
+3. r2modman -> Settings -> **Import local mod** -> choose the zip.
+4. Start modded, open the game's **Settings -> Co-op** tab and set **Network** to *Steam (friends)*.
 
 All players need the **same NestCoop version** and game build. Full guide: README in the zip.
 SHA-256 of the zip: see **TDWolff-NestCoop-$version.zip.sha256**.
@@ -121,9 +163,13 @@ if ($Push) {
     Invoke-GitChecked push origin $tag
 }
 
+if ($Publish) {
+    Publish-Release
+    Write-Host "`nDone: $tag is published on GitHub with the zip and checksum." -ForegroundColor Green
+    exit 0
+}
+
 # ---------------------------------------------------------------- next steps
-$pre = ''
-if ($version.StartsWith('0.')) { $pre = ' --prerelease' }
 Write-Host "`nDone. Files:" -ForegroundColor Green
 Write-Host "   $zip`n   $sha`n   $notesFile"
 Write-Host "`nNext:" -ForegroundColor Green

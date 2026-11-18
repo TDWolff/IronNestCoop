@@ -41,11 +41,13 @@ dotnet build NestCoop -c Release -t:Package
    powershell -ExecutionPolicy Bypass -File tools/release.ps1 -DryRun
    ```
    ```bash
-   powershell -ExecutionPolicy Bypass -File tools/release.ps1 -Push
+   powershell -ExecutionPolicy Bypass -File tools/release.ps1 -Publish
    ```
-3. Publish the GitHub Release with the command the script prints (`gh release create …`), or on github.com:
-   Releases → Draft a new release → pick the tag → paste `dist/release-notes-<version>.md` → attach the zip and
-   `.sha256` → tick pre-release while below 1.0.
+   `-Publish` pushes the tag and creates the GitHub Release (zip + `.sha256` attached, pre-release while below 1.0)
+   with the GitHub CLI; it needs `gh` installed and `gh auth login` done once, and checks that before tagging.
+3. Without `gh`: run with `-Push` instead and publish on github.com: Releases → Draft a new release → pick the tag →
+   paste `dist/release-notes-<version>.md` → attach the zip and `.sha256` → tick pre-release while below 1.0.
+   A tag that's pushed but not yet published can be published later with `-PublishOnly`.
 
 The script refuses to run on a dirty tree, off `main`, with unpushed commits, without a changelog section, or if the
 tag already exists. Releases are built locally because the build needs the game's IL2CPP proxy assemblies, which
