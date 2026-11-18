@@ -384,3 +384,10 @@ draggables (spawned at runtime — will need `MissionSaveIdentity` instead).
   (0.4703, 1.3160, -1.2005), rotation (87.804, 90.000, 270.000) — the spot the author placed in-game. Pedestal style,
   "Place terminal here", "Terminal look" and all Terminal* placement settings were removed; only `Terminal` (on/off)
   remains. If the anchor is missing after a game update, no terminal is built (logged) and ` still opens the menu.
+- **Esc menu swap:** the game's Esc menu is `EscapeMenuToggleUnityEvent` (IsOpen, TrySetOpen, ForceClose,
+  SetOpenState(open, invokeEvent); HandleActionStarted = Esc key). `Menu/EscMenuBridge.cs`: opening the co-op menu
+  closes an open Esc menu via `TrySetOpen(false)` (ForceClose fallback); prefixes on SetOpenState/TrySetOpen(open)/
+  HandleActionStarted close the co-op menu before the Esc menu opens. Fixes both clipboards raised at once.
+- **Swap test ✅:** both directions work (`Esc menu opening — closing the co-op menu` / `closing the Esc menu to show
+  the co-op menu` + `TrySetOpen open=False`). `HandleActionStarted` and `TrySetOpen` fire; `SetOpenState` never did
+  (inlined) — the backstop patches were the ones that mattered.

@@ -89,6 +89,7 @@ internal static class CoopMenu
     public static void Open()
     {
         if (IsOpen) return;
+        EscMenuBridge.CloseEscMenuIfOpen(); // swap with the game's Esc clipboard instead of stacking on it
         IsOpen = true;
         nextFriendRefresh = 0;
         View = PickView();
