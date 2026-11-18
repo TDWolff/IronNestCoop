@@ -199,3 +199,20 @@ draggables (spawned at runtime — will need `MissionSaveIdentity` instead).
   `EvaluateMalfunction [remote]` forced, lamp toggled).
 - Two `LookAtTarget`s can sit on one GameObject (`Barbet/Campaign 1/InMission Interaction blocker`) — IDs now add
   `~n` for the 2nd+ component of the same type.
+
+## Milestone 4: discrete sync (2026-11-17, v0.3.0)
+
+- **What's shared (`SyncPolicy.cs`):** every `LookAtTarget` button except main menu / campaign map (mission flow is
+  M6), options/notepad (`Main Camera/`), operating manuals, espresso machine, record player, cat, bedroom.
+  Checked on send *and* receive.
+- **Reload state is host-authoritative:** host broadcasts every `ArtilleryReloadController.SetState` change
+  (`ReloadState` msg); guests snap to it with `SetState(index, force: true, triggerAnimations: true)` if they differ.
+  Guests still run their own state machine from button presses so it feels instant.
+- **Join snapshot:** a new guest receives the current state of both reload controllers.
+- **Not covered yet:** physical items you carry (`DraggableItem`: shells?, cards, map tokens, records — 30+ objects),
+  locking levers / valves / wheels (dials → M5), map/teleprinter interactions.
+- **M4 test (tutorial 1, FakePeer):** join snapshot ✅ (2 reload states), host reload changes broadcast ✅, guest
+  press advanced host reload ✅ (`applied press Move Cylinder` → state 4→5).
+- **Fix:** the trigger chain and engine starter chain are `LinearSliderInteractable`s that also carry a
+  `LookAtTarget`; dragging fired `OnClickDown` every ~150 ms (and the two chains always together). Buttons on
+  objects with a slider/dial are now excluded from press sync (`SyncPolicy.IsDragControl`) — M5 syncs them by value.

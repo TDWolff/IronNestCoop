@@ -1,39 +1,48 @@
-using Il2Cpp;
 using Il2CppInterop.Runtime;
 using UnityEngine;
 
 namespace NestCoop;
 
 /// <summary>
-/// Stable ID → live component lookup. Built lazily by scanning loaded scenes; cleared on every scene load/unload
-/// because objects come and go with missions.
+/// Stable ID → live component lookup, one cache per component type. Built lazily by scanning loaded scenes;
+/// cleared on every scene load/unload because objects come and go with missions.
 /// </summary>
 internal static class Registry
 {
-    static Dictionary<string, LookAtTarget> buttons;
+    static readonly Dictionary<Type, Dictionary<string, Component>> caches = new();
 
-    public static void Invalidate() => buttons = null;
+    public static void Invalidate() => caches.Clear();
 
-    public static LookAtTarget FindButton(string id)
+    public static T Find<T>(string id) where T : Component
     {
-        if (buttons == null || !buttons.TryGetValue(id, out var b) || b == null)
+        if (!caches.TryGetValue(typeof(T), out var map) || !map.TryGetValue(id, out var c) || c == null)
         {
-            Rebuild();
-            buttons.TryGetValue(id, out b);
+            map = Rebuild<T>();
+            map.TryGetValue(id, out c);
         }
-        return b;
+        return c?.TryCast<T>();
     }
 
-    static void Rebuild()
+    /// <summary>All live instances of T in loaded scenes (prefabs/assets excluded).</summary>
+    public static IEnumerable<T> All<T>() where T : Component
     {
-        buttons = new Dictionary<string, LookAtTarget>();
-        foreach (var o in Resources.FindObjectsOfTypeAll(Il2CppType.Of<LookAtTarget>()))
+        if (!caches.TryGetValue(typeof(T), out var map)) map = Rebuild<T>();
+        foreach (var c in map.Values)
+            if (c != null) yield return c.TryCast<T>();
+    }
+
+    static Dictionary<string, Component> Rebuild<T>() where T : Component
+    {
+        var map = new Dictionary<string, Component>();
+        foreach (var o in Resources.FindObjectsOfTypeAll(Il2CppType.Of<T>()))
         {
-            var c = o.TryCast<LookAtTarget>();
+            var c = o.TryCast<T>();
             if (c == null || !c.gameObject.scene.IsValid()) continue; // skip prefabs/assets
             var id = Ids.Of(c);
-            if (!buttons.TryAdd(id, c)) Mod.Log.Warning($"Registry: duplicate button id {id}");
+            if (!map.TryAdd(id, c)) Mod.Log.Warning($"Registry: duplicate {typeof(T).Name} id {id}");
         }
-        if (Mod.DebugLog.Value) Mod.Log.Msg($"Registry: {buttons.Count} buttons");
+        caches[typeof(T)] = map;
+        if (Mod.DebugLog.Value) Mod.Log.Msg($"Registry: {map.Count} {typeof(T).Name}");
+        return map;
     }
 }

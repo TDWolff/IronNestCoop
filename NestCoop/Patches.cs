@@ -97,8 +97,11 @@ static class TurretController_OnEndRotationDialDrag
 static class ArtilleryReloadController_SetState
 {
     static void Prefix(ArtilleryReloadController __instance, out int __state) => __state = __instance.CurrentStateIndex;
-    static void Postfix(ArtilleryReloadController __instance, int __state) =>
+    static void Postfix(ArtilleryReloadController __instance, int __state)
+    {
         PatchLog.Hit("ArtilleryReloadController.SetState", $"{Ids.Of(__instance)} {__state} -> {__instance.CurrentStateIndex}");
+        if (__instance.CurrentStateIndex != __state) Net.SendReloadState(__instance); // host only; no-op otherwise
+    }
 }
 
 [HarmonyPatch(typeof(GunController), nameof(GunController.FireShell))]
