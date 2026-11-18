@@ -23,6 +23,9 @@ internal static class SyncPolicy
         "Record Player/",
         "Barbet/CatObjects/",
         "Barbet/Base - Bedroom/",
+
+        // Our own terminal: pressing yours must never open another player's menu.
+        "NestCoop Terminal",
     };
 
     /// <summary>

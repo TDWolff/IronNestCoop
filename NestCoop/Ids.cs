@@ -69,6 +69,52 @@ internal static class Ids
         }
         return n == 0 ? "" : "#" + n;
     }
+
+    /// <summary>
+    /// Reverse of <see cref="Of"/> for transforms: "scene:A/B#1/C" → the Transform (inactive objects included), or null.
+    /// A trailing "#n" on a segment means the n-th sibling with that name; a trailing "~n" (component index) is ignored.
+    /// </summary>
+    public static Transform ResolveTransform(string id)
+    {
+        if (string.IsNullOrEmpty(id)) return null;
+        int colon = id.IndexOf(':');
+        if (colon < 0) return null;
+        string sceneName = id[..colon];
+        string path = id[(colon + 1)..];
+        int tilde = path.LastIndexOf('~');
+        if (tilde > path.LastIndexOf('/')) path = path[..tilde];
+
+        var scene = UnityEngine.SceneManagement.SceneManager.GetSceneByName(sceneName);
+        if (!scene.IsValid() || !scene.isLoaded) return null;
+        var segs = path.Split('/');
+
+        var (rootName, rootIdx) = Segment(segs[0]);
+        Transform cur = null;
+        int seen = 0;
+        foreach (var r in scene.GetRootGameObjects())
+            if (r.name == rootName && seen++ == rootIdx) { cur = r.transform; break; }
+
+        for (int s = 1; s < segs.Length && cur != null; s++)
+        {
+            var (name, idx) = Segment(segs[s]);
+            Transform next = null;
+            int k = 0;
+            for (int i = 0; i < cur.childCount; i++)
+            {
+                var c = cur.GetChild(i);
+                if (c.name == name && k++ == idx) { next = c; break; }
+            }
+            cur = next;
+        }
+        return cur;
+    }
+
+    static (string name, int index) Segment(string seg)
+    {
+        int hash = seg.LastIndexOf('#');
+        if (hash > 0 && int.TryParse(seg[(hash + 1)..], out int n)) return (seg[..hash], n);
+        return (seg, 0);
+    }
 }
 
 /// <summary>

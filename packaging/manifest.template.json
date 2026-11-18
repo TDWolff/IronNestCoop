@@ -1,0 +1,9 @@
+{
+    "name": "NestCoop",
+    "version_number": "@VERSION@",
+    "website_url": "",
+    "description": "Online co-op for IRON NEST: crew one turret together with Steam friends. Buttons, wheels, levers, reload, turret, missions and player avatars are synced. Early test build.",
+    "dependencies": [
+        "LavaGang-MelonLoader-0.7.3"
+    ]
+}

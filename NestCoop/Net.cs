@@ -45,6 +45,11 @@ internal static class Net
     internal static int hostPeer = -1; // guest side: the host's peer id
     static readonly HashSet<int> peers = new();
 
+    /// <summary>Connected peers with display names (for the menu). Guests see just the host.</summary>
+    public static IEnumerable<(int id, string name)> Peers => transport == null
+        ? Enumerable.Empty<(int, string)>()
+        : peers.Select(id => (id, transport.DescribePeer(id))).ToList();
+
     /// <summary>Overlay text; null when offline.</summary>
     public static string StatusLine => Role switch
     {
@@ -70,11 +75,12 @@ internal static class Net
         Say(UseSteam ? "Hosting via Steam (friends can join)" : $"Hosting on localhost:{Mod.Port.Value}");
     }
 
-    public static void Join()
+    /// <summary>Join. <paramref name="target"/> overrides SteamJoinTarget / JoinAddress (e.g. a friend picked in the menu).</summary>
+    public static void Join(string target = null)
     {
         if (Active) { Say($"Already {Role}"); return; }
         transport = CreateTransport();
-        string address = UseSteam ? Mod.SteamJoinTarget.Value : Mod.JoinAddress.Value;
+        string address = target ?? (UseSteam ? Mod.SteamJoinTarget.Value : Mod.JoinAddress.Value);
         if (!transport.Connect(address, Mod.Port.Value)) { Say("Join failed to start"); transport = null; return; }
         Role = Role.Guest;
         if (!UseSteam) Say($"Joining {address}:{Mod.Port.Value} ...");
@@ -103,7 +109,7 @@ internal static class Net
         if (transport != null && !transport.IsRunning) Stop("connection closed");
     }
 
-    static bool UseSteam => string.Equals(Mod.TransportName.Value, "Steam", StringComparison.OrdinalIgnoreCase);
+    internal static bool UseSteam => string.Equals(Mod.TransportName.Value, "Steam", StringComparison.OrdinalIgnoreCase);
 
     static ITransport CreateTransport()
     {

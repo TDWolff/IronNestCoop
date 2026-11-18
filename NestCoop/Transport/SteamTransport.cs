@@ -217,6 +217,9 @@ internal sealed class SteamTransport : ITransport
             if (id != exceptPeer) SteamApi.Send(sid, framed, reliable);
     }
 
+    public string DescribePeer(int peer) =>
+        steamOf.TryGetValue(peer, out ulong sid) ? SteamApi.NameOf(sid) : $"Peer #{peer}";
+
     public void Stop()
     {
         if (!running) return;

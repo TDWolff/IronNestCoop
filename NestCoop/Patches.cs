@@ -24,6 +24,7 @@ static class LookAtTarget_OnClickDown
 {
     static void Postfix(LookAtTarget __instance)
     {
+        if (Terminal.Is(__instance)) { Mod.Log.Msg("Terminal: pressed"); Menu.CoopMenu.Open(); return; } // our terminal: open the menu, never sync
         if (!Net.ApplyingRemote) DebugKeys.LastPressed = __instance;
         PatchLog.Hit("LookAtTarget.OnClickDown", $"{Ids.Of(__instance)} active={__instance.isActive} malfunction={__instance.currentMalfunction}");
         Net.SendButtonPress(__instance); // no-op when offline or when this press came from the network

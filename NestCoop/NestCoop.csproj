@@ -43,9 +43,13 @@
     <Reference Include="Assembly-CSharp"><HintPath>$(Il2CppAsm)\Assembly-CSharp.dll</HintPath></Reference>
     <Reference Include="Il2Cppmscorlib"><HintPath>$(Il2CppAsm)\Il2Cppmscorlib.dll</HintPath></Reference>
     <Reference Include="UnityEngine.IMGUIModule"><HintPath>$(Il2CppAsm)\UnityEngine.IMGUIModule.dll</HintPath></Reference>
+    <Reference Include="UnityEngine.AnimationModule"><HintPath>$(Il2CppAsm)\UnityEngine.AnimationModule.dll</HintPath></Reference>
     <Reference Include="UnityEngine.InputLegacyModule"><HintPath>$(Il2CppAsm)\UnityEngine.InputLegacyModule.dll</HintPath></Reference>
     <Reference Include="Unity.InputSystem"><HintPath>$(Il2CppAsm)\Unity.InputSystem.dll</HintPath></Reference>
     <Reference Include="UnityEngine.PhysicsModule"><HintPath>$(Il2CppAsm)\UnityEngine.PhysicsModule.dll</HintPath></Reference>
+    <Reference Include="UnityEngine.UI"><HintPath>$(Il2CppAsm)\UnityEngine.UI.dll</HintPath></Reference>
+    <Reference Include="Unity.TextMeshPro"><HintPath>$(Il2CppAsm)\Unity.TextMeshPro.dll</HintPath></Reference>
+    <Reference Include="UnityEngine.UIModule"><HintPath>$(Il2CppAsm)\UnityEngine.UIModule.dll</HintPath></Reference>
     <Reference Include="UnityEngine.CoreModule"><HintPath>$(Il2CppAsm)\UnityEngine.CoreModule.dll</HintPath></Reference>
   </ItemGroup>
 
@@ -70,6 +74,37 @@
     <Copy Condition="Exists('$(GuestProfilePath)\Mods')" SourceFiles="$(TargetPath)" DestinationFolder="$(GuestProfilePath)\Mods" SkipUnchangedFiles="false" ContinueOnError="true" />
     <Copy Condition="Exists('$(GuestProfilePath)\UserLibs')" SourceFiles="$(PkgLiteNetLib)\lib\netstandard2.1\LiteNetLib.dll" DestinationFolder="$(GuestProfilePath)\UserLibs" SkipUnchangedFiles="true" ContinueOnError="true" />
     <Message Condition="Exists('$(GuestProfilePath)\Mods')" Importance="high" Text="NestCoop -> $(GuestProfilePath)\Mods (guest profile)" />
+  </Target>
+
+  <!--
+    r2modman / Thunderstore package:  dotnet build NestCoop -c Release -t:Package
+    Layout (same as other MelonLoader packages for this game): manifest.json, README.md, icon.png, Mods/, UserLibs/.
+    The version comes from Mod.Version in Mod.cs, so the package and the network version check always agree.
+    Output: dist/TDWolff-NestCoop-<version>.zip
+  -->
+  <Target Name="Package" DependsOnTargets="Build">
+    <PropertyGroup>
+      <ModVersion>$([System.Text.RegularExpressions.Regex]::Match($([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)Mod.cs')), 'Version = "([0-9]+\.[0-9]+\.[0-9]+)"').Groups[1].Value)</ModVersion>
+      <PackagingDir>$(MSBuildThisFileDirectory)..\packaging</PackagingDir>
+      <DistDir>$(MSBuildThisFileDirectory)..\dist</DistDir>
+      <PkgStage>$(DistDir)\stage</PkgStage>
+      <PkgZip>$(DistDir)\TDWolff-NestCoop-$(ModVersion).zip</PkgZip>
+      <ManifestJson>$([System.IO.File]::ReadAllText('$(PackagingDir)\manifest.template.json').Replace('@VERSION@', '$(ModVersion)'))</ManifestJson>
+    </PropertyGroup>
+    <Error Condition="'$(ModVersion)' == ''" Text="Package: couldn't read Version = &quot;x.y.z&quot; from Mod.cs" />
+
+    <RemoveDir Directories="$(PkgStage)" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(PkgStage)\Mods" />
+    <Copy SourceFiles="$(PkgLiteNetLib)\lib\netstandard2.1\LiteNetLib.dll" DestinationFolder="$(PkgStage)\UserLibs" />
+    <Copy SourceFiles="$(PackagingDir)\README.md;$(PackagingDir)\icon.png" DestinationFolder="$(PkgStage)" />
+    <!-- Thunderstore rejects a manifest.json with a UTF-8 BOM, so write it with .NET's BOM-less UTF-8. -->
+    <WriteLinesToFile File="$(PkgStage)\manifest.json" Lines="$(ManifestJson)" Overwrite="true" Encoding="utf-8" WriteOnlyWhenDifferent="false" />
+    <Exec Command="powershell -NoProfile -Command &quot;$p='$(PkgStage)\manifest.json'; $t=[IO.File]::ReadAllText($p); [IO.File]::WriteAllText($p, $t, (New-Object Text.UTF8Encoding $false))&quot;" />
+
+    <MakeDir Directories="$(DistDir)" />
+    <Delete Files="$(PkgZip)" />
+    <ZipDirectory SourceDirectory="$(PkgStage)" DestinationFile="$(PkgZip)" Overwrite="true" />
+    <Message Importance="high" Text="Package -> $(PkgZip)" />
   </Target>
 
 </Project>

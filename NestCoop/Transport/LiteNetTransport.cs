@@ -73,6 +73,9 @@ internal sealed class LiteNetTransport : ITransport
             if (id != exceptPeer) p.Send(data, method);
     }
 
+    public string DescribePeer(int peer) =>
+        peerOf.TryGetValue(peer, out var p) ? $"Peer #{peer} ({p.RoundTripTime} ms)" : $"Peer #{peer}";
+
     public void Stop()
     {
         if (manager.IsRunning) manager.Stop(true);

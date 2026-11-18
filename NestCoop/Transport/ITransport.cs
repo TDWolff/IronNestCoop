@@ -24,6 +24,9 @@ internal interface ITransport
     /// <summary>Send to every connected peer, optionally skipping one (e.g. the peer the message came from).</summary>
     void Broadcast(byte[] data, bool reliable, int exceptPeer = -1);
 
+    /// <summary>Human-readable name for a connected peer (Steam name, or "Guest #n").</summary>
+    string DescribePeer(int peer);
+
     /// <summary>Disconnect everyone and close the socket.</summary>
     void Stop();
 

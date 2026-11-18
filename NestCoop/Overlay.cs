@@ -13,9 +13,15 @@ internal static class Overlay
     static float toastUntil;
     static bool broken;
 
+    /// <summary>Most recent toast text and when it was shown (the menu displays it, since it covers the corner).</summary>
+    public static string LastMessage { get; private set; }
+    public static float LastMessageTime { get; private set; }
+
     public static void Toast(string msg, float seconds = 4f)
     {
         toast = msg;
+        LastMessage = msg;
+        LastMessageTime = Time.unscaledTime;
         toastUntil = Time.unscaledTime + seconds;
     }
 

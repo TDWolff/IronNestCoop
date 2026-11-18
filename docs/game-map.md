@@ -310,3 +310,77 @@ draggables (spawned at runtime — will need `MissionSaveIdentity` instead).
 - **M8 local check ✅:** PageUp → `Steam check: OK as <name> (<SteamID>), app 2950790. Friends in IRON NEST: none` —
   P/Invoke into the game's steam_api64.dll works (interfaces, SteamID, AppID, friend scan). P2P session untested
   (needs a friend who owns the game).
+
+## Co-op menu (2026-11-17) — built, untested
+
+- Swappable by design: `Menu/CoopMenu.cs` = state + actions + mouse/player handling (no drawing);
+  `Menu/IMenuView.cs` = `Draw()`; `Menu/ImguiMenuView.cs` = current look. A uGUI or game-style view is a new
+  `IMenuView` assigned to `CoopMenu.View`; nothing else changes.
+- Opens with `MenuKey` (Backquote). Shows status, Host/Join/Leave, Steam/localhost switch (when offline), connected
+  players (Steam names / LiteNetLib ping), Steam friends in IRON NEST with per-friend Join, debug-log toggle.
+- Mouse/player: saves `DynamicCursorManager._currentMode`, calls `SwitchToFreeMouse()` + `SetUIBlocking(true, false)`,
+  `FirstPersonController.SetFrozen(true)`; on close `SetUIBlocking(false, false)` + `SwitchToPresentationMode(saved)`
+  and unfreeze. Forces `Cursor.lockState = None` / `visible = true` every frame while open.
+- IMGUI uses only `GUI.*` with explicit rects (no `GUILayout`/`GUI.Window`: option arrays / delegates through IL2CPP).
+- Transports gained `DescribePeer(id)`; `Net.Join(target)` takes an explicit friend.
+- **Menu test 3 findings:** (1) clicks inside the menu still hit the world (table lamp `OnClickDown` with
+  `inWindow True`): the game's `DynamicCursorManager` raycasts the raw mouse; `SetUIBlocking(true, …)` doesn't stop it.
+  (2) `GUI.Button` never returned true for Host although mouse down/up were inside it and IMGUI set `hotControl` — IMGUI
+  control logic is unreliable here (likely stripped and rebuilt by Il2CppInterop). Drawing (`GUI.Box/Label`) works.
+  **Fix:** `ImguiMenuView` draws boxes and hit-tests `Event.current` MouseDown itself (no GUI.Button/Toggle/ScrollView);
+  `MenuInputBlock.cs` skips `LookAtTarget.HandleClickDownFromManager`, `Dial/LinearSliderInteractable.HandlePrimaryClickDown`,
+  `DynamicCursorManager.PerformHoverDetection/HandleGrabInput` while the menu is open.
+- **Menu test 4 ✅:** every button/toggle registers (`Menu: clicked …` + action), all five MenuBlock prefixes fire.
+  One leak: the Close click pressed the lamp 3 ms later (input unblocked within the same click) → world clicks stay
+  blocked 0.3 s after closing (`CoopMenu.BlocksWorld`).
+
+## Game-style co-op menu (2026-11-17) — built, untested
+
+- UI dump (`UiDump.cs`, PageDown; game reports **Version 1.0 (1742)**): the Esc menu is
+  `Main Camera/Options Menu Parent/Clipboard Main Menu` [Animator, AnimatorBoolToggler, PickUpZoomTarget, FailSafeActionActivator]
+  → `Canvas` (world-space, GraphicRaycaster) → `ESC Menu Buttons` (MissionSaveMenuController…) → Unity UI `Button`s
+  (`Bg`, `BgShadow`, `SelectionUGUI/Selected`, `Text (TMP)` TextMeshProUGUI + StaticLocalisedText) at y 128.8, 83.6, …
+  Table-lamp "Universal Button" = Animator + LookAtTarget + BoxCollider + 4×AnimatorBoolToggler + Interactable (no mesh
+  of its own — the switch mesh is a sibling).
+- `Menu/ClipboardMenuView.cs`: clones that clipboard under an inactive holder (no Awake), destroys every game script
+  except AnimatorBoolToggler/SelectionUGUI (and all localisation), keeps one game button as template for a pool of 9,
+  slides in/out with the clone's own AnimatorBoolToggler. Clicks: Harmony prefix on `UnityEngine.UI.Button.OnPointerClick`
+  / `OnSubmit` matching our buttons by pointer (`ClipboardButtonPatch.cs`) — no delegates into onClick.
+- `MenuStyle` = Game (default) | Imgui; Game falls back to IMGUI if the clipboard can't be built. Game UI uses the
+  game's `RestoreMouseForMenu()` cursor mode; IMGUI uses `SwitchToFreeMouse()` + forced OS cursor.
+- **Clipboard menu test 1 ✅ (log):** built from the clipboard (11 game scripts removed, animator param `IsRaised`),
+  button clicks arrive via `Button.OnPointerClick` (Host, Leave, Network switch both ways, Close), Steam and localhost
+  hosting from the menu, world clicks blocked while open. User confirmed it looks right (slides in like the Esc menu).
+
+## NestCoop Terminal (2026-11-17) — built, untested
+
+- `Terminal.cs`: physical object that opens the co-op menu. Clickable part = clone of the table lamp's
+  "Universal Button" (keeps the game's cursor/prompt config → "Interact with NestCoop Terminal"), with its serialized
+  UnityEvents replaced by empty ones (they pointed at the real lamp), animators/togglers/children removed, malfunctions
+  off, own BoxCollider over the top panel. Look = primitives with the Requisition Console `.Cover` material, orange
+  button, 3D label cloned from the Esc clipboard's `OPTIONS MENU (TMP)` TextMeshPro (localisation removed).
+- Default spot: originally 1.6 m left of the Requisition Console — bad, it is covered by a tarp in early levels; now the author's hand-placed spot (0.344, -0.118, -20.661), yaw 181.35. "Place terminal here" (both menus) raycasts 5 m from
+  `Camera.main` and saves `TerminalPlaced/X/Y/Z/Yaw`. `Terminal = false` hides it.
+- Press → `LookAtTarget.OnClickDown` postfix → `CoopMenu.Open()`; excluded from sync in `SyncPolicy`.
+- Proxy notes: `Physics.Raycast(..., out RaycastHit, ...)` (out, not ref); `Animator` needs UnityEngine.AnimationModule.
+- **Anchored placement:** "Place terminal here" now parents the terminal to the object it was placed on (the raycast
+  hit, walked up to the first uniformly scaled ancestor) and saves `TerminalAnchor` (stable ID) + local
+  position/rotation + `TerminalScale` (0.45 desk unit when the surface is > 0.4 m above the player's feet). So it moves
+  with turret rotation / `MoveTurret`. Only anchors in Master Turret Scene (mission scenes unload).
+  `Ids.ResolveTransform(id)` turns a stable ID back into a Transform. The default spot will become an anchored table
+  spot once one is picked in-game.
+- **Placement fix:** the first anchored placement hit the menu clipboard (raycast ran while it was still in front of the
+  camera) and saved `…/Main Camera/Options Menu Parent/NestCoop Clipboard/ClipBoard` as the anchor. Now placement runs
+  0.6 s after closing the menu, uses `Physics.RaycastAll` and ignores hits under the camera or the terminal itself, and
+  saved anchors under `Main Camera/` or containing "NestCoop" are rejected on load.
+- **Styles:** `TerminalStyle` = Pedestal (floor) | Button (compact box with a big orange button, picked automatically for
+  surfaces > 0.4 m above the player's feet — e.g. the safe-box lid by the computer desk). Visuals rebuild on placement.
+- **Placement test 2:** anchored to `Master Turret Scene:Turret/Colliders/.Collider.008` (the safe box's collision
+  proxy, under `Turret` → moves with the turret), local (0.47, 1.32, -1.20) rot (87.8, 90, 270); pressing works. But
+  style came out Pedestal: `FirstPersonController.transform.position` isn't at the feet. Now uses
+  `controller.bounds.min.y` (CharacterController) as feet height, and the menu has "Terminal look: Pedestal/Button".
+- **Final (user decision):** button look only, fixed place. The terminal is a child of
+  `Master Turret Scene:Turret/Colliders/.Collider.008` (safe box by the computer desk) at local position
+  (0.4703, 1.3160, -1.2005), rotation (87.804, 90.000, 270.000) — the spot the author placed in-game. Pedestal style,
+  "Place terminal here", "Terminal look" and all Terminal* placement settings were removed; only `Terminal` (on/off)
+  remains. If the anchor is missing after a game update, no terminal is built (logged) and ` still opens the menu.

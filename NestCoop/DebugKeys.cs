@@ -19,6 +19,8 @@ internal static class DebugKeys
 
     public static void Update()
     {
+        if (Pressed(Mod.MenuKey.Value)) Menu.CoopMenu.Toggle();
+        if (Pressed(Mod.UiDumpKey.Value)) { try { UiDump.Run(); } catch (Exception e) { Mod.Log.Error($"UI dump failed: {e}"); } }
         if (Pressed(Mod.HostKey.Value)) Net.StartHost();
         if (Pressed(Mod.JoinKey.Value)) Net.Join();
         if (Pressed(Mod.LeaveKey.Value)) Net.Stop("leave key");
