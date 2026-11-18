@@ -41,6 +41,12 @@ internal static class Terminal
 
     public static bool Is(LookAtTarget t) => button != null && t != null && t.Pointer == button.Pointer;
 
+    /// <summary>Settings tab: show/hide an already-built terminal when the Terminal setting changes.</summary>
+    public static void ApplyEnabled()
+    {
+        if (root != null) root.SetActive(Mod.TerminalEnabled.Value);
+    }
+
     /// <summary>Per frame: build once the turret scene is ready.</summary>
     public static void Update()
     {

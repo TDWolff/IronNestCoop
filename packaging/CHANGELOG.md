@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.6
+- **Co-op tab in the game's Settings** (main menu and Esc menu): your name, network (Steam/Localhost), max players,
+  resync interval, NestCoop Terminal on/off, co-op menu style and debug logging, in the game's own widgets.
+  Changes save immediately; a new name is sent from the next session.
+
 ## 0.9.5
 - **Session logs are saved automatically:** when a co-op session ends (leave, disconnect, failed join, or quitting
   during a session) a copy of the log goes to `UserData/NestCoop/logs/` with a short header (versions, role,
