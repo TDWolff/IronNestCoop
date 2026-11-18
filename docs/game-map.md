@@ -252,3 +252,27 @@ draggables (spawned at runtime — will need `MissionSaveIdentity` instead).
 - **M5 retest 3 ✅:** FakePeer `drag 23 7200` (wheel -25200 → -18000) turned the host turret -35° → -25° exactly
   (= -18000 / 720), peaking at 2.99°/s, and the turret settled with desired = angle. Guest-side turret correction
   (TurretState snap/blend) still needs a real second player to test.
+
+## Milestone 6: mission flow (2026-11-17, v0.5.0) — built, untested
+
+- Recon: `MissionManager.Instance`, `CurrentPhase` (`GamePhase`: MainMenu 0, BrowsingMap 1, MissionActive 2),
+  `CurrentOperation.OperationID`, `CurrentMission.MissionID`; `StartOperation` has 2- and 3-arg (checkpoint) overloads.
+  `FireMission` has `useFixedSeed`, `fixedSeed`, `seed`, `GenerateMission()`; its placement helpers take a `System.Random`.
+- `MissionSync.cs` / `MissionPatches.cs`: host broadcasts `MissionState` (phase, op, mission, seed) on any change and in
+  the join snapshot; `FinishMission` as `MissionEvent`. Guests apply via the same MissionManager calls and are blocked
+  (`MissionGate`) from StartOperation/Resume/LoadMission/Reload/EnterBrowsingMap/ReturnToMap/EndOperation/FinishMission.
+- Seed: host picks one before a mission loads; `GenerateMission` is forced to it on both sides (unless designer-fixed).
+- Local test without a second game: `MissionReplayKey` (Insert) re-applies the last MissionActive state through the
+  guest apply path. Guest gating itself needs a real second player.
+- Known gaps: checkpoints/resume aren't transferred; `ReloadCurrentMission` on the host doesn't reload guests (same id);
+  other randomness (UnityEngine.Random) isn't seeded.
+- **M6 test 1 (tutorial 1 = OperationID `Base_Campaign`, MissionID `Hospital False Flag`):** host states ✅
+  (MainMenu → BrowsingMap → MissionActive), join snapshot ✅, seed forced into `GenerateMission` ✅, guest-sent
+  MissionState ignored ✅. Starting from the campaign map goes `ResumeOperation` → `StartOperation(op, mission,
+  checkpoint)` → `LoadMission` in one frame. ❌ Insert replay: NullReferenceException in LoadMission.
+  Causes + fixes: (1) transitional states (`MissionActive` with empty mission id, while starting and while returning to
+  menu) were sent/recorded → now skipped; (2) a new seed was picked at each nested call → only once per frame.
+- **M6 retest ✅:** one seed per start (42872608), transitional states skipped, and the Insert replay ran the guest path
+  `StartOperation(Base_Campaign, Hospital False Flag)` from the main menu → tutorial 1 loaded and
+  `GenerateMission seed=42872608` matched the original run. Still untested with a real guest: MissionGate blocking and
+  applying BrowsingMap/MainMenu/FinishMission.

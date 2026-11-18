@@ -11,22 +11,27 @@
 //   drag <n> <delta> [seconds]   act like a player turning control #n by <delta> (default over 2 s):
 //                   Grab, values at 20 Hz, Release. Try the traverse wheel: the host turret should turn.
 //   turret          print the latest host turret state
+//   mission <phase> pretend to be authoritative: send MissionState (0 menu, 1 map, 2 mission) for the last
+//                   mission seen — the host must IGNORE it (only the host drives missions)
 //   quit
 // Protocol must match NestCoop/Net.cs (connection key "NestCoop-<version>", BinaryWriter encoding):
 //   1 ButtonPress:  string id, int32 malfunction
 //   2 ReloadState:  string id, int32 stateIndex
 //   3 ControlValue: string id, float value                      (unreliable)
 //   4 ControlGrab:  string id, bool grabbed, float value
+//   6 MissionState: byte phase, string operationId, string missionId, int32 seed
+//   7 MissionEvent: byte kind (1 = FinishMission)
 //   5 TurretState:  float angle, float desired, float velocity, int32 n, n x float gunElevation (unreliable)
 using System.Collections.Concurrent;
 using LiteNetLib;
 
 string address = args.Length > 0 ? args[0] : "127.0.0.1";
 int port = args.Length > 1 ? int.Parse(args[1]) : 27960;
-string version = args.Length > 2 ? args[2] : "0.4.0";
+string version = args.Length > 2 ? args[2] : "0.5.0";
 string key = "NestCoop-" + version;
 
-const byte ButtonPress = 1, ReloadState = 2, ControlValue = 3, ControlGrab = 4, TurretState = 5;
+const byte ButtonPress = 1, ReloadState = 2, ControlValue = 3, ControlGrab = 4, TurretState = 5, MissionState = 6, MissionEvent = 7;
+string lastOp = "", lastMission = "";
 var controlIds = new List<string>();
 var controlValues = new Dictionary<string, float>();
 string turretLine = "(none yet)";
@@ -43,7 +48,7 @@ NetPeer host = null;
 var listener = new EventBasedNetListener();
 var manager = new NetManager(listener) { AutoRecycle = true, DisconnectTimeout = 10000 };
 
-listener.PeerConnectedEvent += p => { host = p; Console.WriteLine("[connected to host] commands: list | again | send <n> | press <id> | reload <n> <i> | controls | drag <n> <delta> [s] | turret | quit"); };
+listener.PeerConnectedEvent += p => { host = p; Console.WriteLine("[connected to host] commands: list | again | send <n> | press <id> | reload <n> <i> | controls | drag <n> <delta> [s] | turret | mission <p> | quit"); };
 listener.PeerDisconnectedEvent += (p, info) => { host = null; Console.WriteLine($"[disconnected: {info.Reason}]"); };
 listener.NetworkReceiveEvent += (p, reader, ch, method) =>
 {
@@ -89,6 +94,16 @@ listener.NetworkReceiveEvent += (p, reader, ch, method) =>
             rxTurret++;
             break;
         }
+        case MissionState:
+        {
+            byte phase = r.ReadByte(); lastOp = r.ReadString(); lastMission = r.ReadString(); int seed = r.ReadInt32();
+            string[] names = { "MainMenu", "BrowsingMap", "MissionActive" };
+            Console.WriteLine($"<- mission state {(phase < names.Length ? names[phase] : phase.ToString())} op='{lastOp}' mission='{lastMission}' seed={seed}");
+            break;
+        }
+        case MissionEvent:
+            Console.WriteLine($"<- mission event {(r.ReadByte() == 1 ? "FinishMission" : "?")}");
+            break;
         default: Console.WriteLine($"<- unknown message type {type}"); break;
     }
 };
@@ -146,6 +161,16 @@ while (true)
                 if (controlIds.Count == 0) Console.WriteLine("  none yet (the host sends them when you join)");
                 break;
             case "turret": Console.WriteLine("  turret " + turretLine); break;
+            case "mission":
+            {
+                if (host == null) { Console.WriteLine("not connected"); break; }
+                if (parts.Length < 2 || !byte.TryParse(parts[1], out byte ph)) { Console.WriteLine("usage: mission <0|1|2>"); break; }
+                using var ms = new MemoryStream();
+                using (var w = new BinaryWriter(ms)) { w.Write(MissionState); w.Write(ph); w.Write(lastOp); w.Write(lastMission); w.Write(12345); }
+                host.Send(ms.ToArray(), DeliveryMethod.ReliableOrdered);
+                Console.WriteLine($"-> mission state {ph} (host should ignore)");
+                break;
+            }
             case "drag":
             {
                 var a = parts.Length > 1 ? parts[1].Split(' ', StringSplitOptions.RemoveEmptyEntries) : Array.Empty<string>();
@@ -160,7 +185,7 @@ while (true)
                 else Console.WriteLine("usage: drag <n> <delta> [seconds]  (see controls)");
                 break;
             }
-            default: Console.WriteLine("commands: list | again | send <n> | press <id> | reload <n> <i> | controls | drag <n> <delta> [s] | turret | quit"); break;
+            default: Console.WriteLine("commands: list | again | send <n> | press <id> | reload <n> <i> | controls | drag <n> <delta> [s] | turret | mission <p> | quit"); break;
         }
     }
     Thread.Sleep(15);

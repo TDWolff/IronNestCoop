@@ -11,6 +11,8 @@ internal enum MsgType : byte
     ReloadState = 2,   // string id, int stateIndex         (host → guests, also in join snapshot)
     ControlValue = 3,  // string id, float value            (dragger → host → others; host → guests) unreliable
     ControlGrab = 4,   // string id, bool grabbed, float v  (dragger → host → others) reliable
+    MissionState = 6,  // byte phase, string operationId, string missionId, int seed (host → guests, join snapshot)
+    MissionEvent = 7,  // byte kind (1 = FinishMission)                         (host → guests)
     TurretState = 5,   // float angle, float desired, float velocity, int n, n×float gunElevation (host → guests)
 }
 
@@ -86,6 +88,7 @@ internal static class Net
         hostPeer = -1;
         peers.Clear();
         ControlSync.Reset();
+        MissionSync.Reset();
         t.Stop();
     }
 
@@ -98,7 +101,7 @@ internal static class Net
         {
             peers.Add(id);
             if (Role == Role.Guest) { hostPeer = id; Say("Connected to host"); }
-            else { Say($"Guest #{id} joined"); SendSnapshot(id); ControlSync.SendSnapshot(id); }
+            else { Say($"Guest #{id} joined"); MissionSync.SendSnapshot(id); SendSnapshot(id); ControlSync.SendSnapshot(id); }
         };
         t.PeerDisconnected += (id, reason) =>
         {
@@ -230,6 +233,10 @@ internal static class Net
                 case MsgType.ControlGrab:
                 case MsgType.TurretState:
                     ControlSync.Handle(type, from, r, data);
+                    break;
+                case MsgType.MissionState:
+                case MsgType.MissionEvent:
+                    MissionSync.Handle(type, r);
                     break;
                 default:
                     Mod.Log.Warning($"Net: unknown message {type} from #{from}");

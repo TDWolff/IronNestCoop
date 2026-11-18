@@ -23,6 +23,7 @@ internal static class DebugKeys
         if (Pressed(Mod.JoinKey.Value)) Net.Join();
         if (Pressed(Mod.LeaveKey.Value)) Net.Stop("leave key");
         if (Mod.DebugLog.Value && Pressed(Mod.ReplayKey.Value)) ReplayLastPress();
+        if (Mod.DebugLog.Value && Pressed(Mod.MissionReplayKey.Value)) MissionSync.DebugReplay();
     }
 
     /// <summary>True on the frame the named key goes down (Input System; legacy Input proved unnecessary).</summary>
