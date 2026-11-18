@@ -140,7 +140,13 @@ internal static class ControlSync
         foreach (var id in heldBy.Where(kv => kv.Value == peer).Select(kv => kv.Key).ToList())
         {
             heldBy.Remove(id);
-            if (controls.TryGetValue(id, out var c)) SetRemoteDrag(c, false); // don't leave the turret stuck mid-drag
+            if (controls.TryGetValue(id, out var c))
+            {
+                SetRemoteDrag(c, false); // don't leave the turret stuck mid-drag
+                float v = c.Get();
+                c.LastSent = v;
+                Net.Broadcast(Net.Write(MsgType.ControlGrab, w => { w.Write(id); w.Write(false); w.Write(v); }), reliable: true); // other guests too
+            }
         }
     }
 

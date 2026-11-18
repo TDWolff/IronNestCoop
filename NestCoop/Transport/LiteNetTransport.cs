@@ -20,13 +20,24 @@ internal sealed class LiteNetTransport : ITransport
     public event Action<int> PeerConnected;
     public event Action<int, string> PeerDisconnected;
     public event Action<int, byte[]> Received;
+    public event Action<string> ConnectFailed;
 
     public LiteNetTransport(string connectionKey)
     {
         this.connectionKey = connectionKey;
         manager = new NetManager(listener) { AutoRecycle = true, DisconnectTimeout = 10000 };
 
-        listener.ConnectionRequestEvent += req => req.AcceptIfKey(this.connectionKey);
+        // Version check (M9): accept only our exact key; another NestCoop key gets rejected WITH our key attached,
+        // so the guest can show what differs. Anything else is rejected silently.
+        listener.ConnectionRequestEvent += req =>
+        {
+            string theirs = null;
+            try { theirs = req.Data.GetString(); } catch { }
+            if (theirs == this.connectionKey) { req.Accept(); return; }
+            Mod.Log.Warning($"Net: rejected a connection with key '{theirs}' (ours '{this.connectionKey}')");
+            if (VersionCheck.LooksLikeNestCoop(theirs)) req.Reject(System.Text.Encoding.UTF8.GetBytes(this.connectionKey));
+            else req.Reject();
+        };
         listener.PeerConnectedEvent += peer =>
         {
             int id = nextId++;
@@ -36,9 +47,18 @@ internal sealed class LiteNetTransport : ITransport
         };
         listener.PeerDisconnectedEvent += (peer, info) =>
         {
-            if (!idOf.Remove(peer, out int id)) return;
+            if (!idOf.Remove(peer, out int id))
+            {
+                // Never connected: this was our join attempt failing.
+                string why = info.Reason.ToString();
+                if (info.Reason == DisconnectReason.ConnectionRejected && info.AdditionalData != null && info.AdditionalData.AvailableBytes > 0)
+                    why = VersionCheck.Explain(System.Text.Encoding.UTF8.GetString(info.AdditionalData.GetRemainingBytes()));
+                else why = Friendly(info.Reason);
+                ConnectFailed?.Invoke(why);
+                return;
+            }
             peerOf.Remove(id);
-            PeerDisconnected?.Invoke(id, info.Reason.ToString());
+            PeerDisconnected?.Invoke(id, Friendly(info.Reason));
         };
         listener.NetworkReceiveEvent += (peer, reader, channel, method) =>
         {
@@ -72,6 +92,17 @@ internal sealed class LiteNetTransport : ITransport
         foreach (var (id, p) in peerOf)
             if (id != exceptPeer) p.Send(data, method);
     }
+
+    static string Friendly(DisconnectReason r) => r switch
+    {
+        DisconnectReason.RemoteConnectionClose => "left the session",
+        DisconnectReason.DisconnectPeerCalled => "disconnected",
+        DisconnectReason.Timeout => "connection timed out",
+        DisconnectReason.ConnectionFailed => "couldn't reach the host (is it hosting?)",
+        DisconnectReason.ConnectionRejected => "connection rejected",
+        DisconnectReason.HostUnreachable or DisconnectReason.NetworkUnreachable => "network unreachable",
+        _ => r.ToString(),
+    };
 
     public string DescribePeer(int peer) =>
         peerOf.TryGetValue(peer, out var p) ? $"Peer #{peer} ({p.RoundTripTime} ms)" : $"Peer #{peer}";

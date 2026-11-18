@@ -31,7 +31,8 @@ Then:
   playing IRON NEST. To pick someone specific, set `SteamJoinTarget` to part of their Steam name or their SteamID64.
 - **Leave:** press **Delete**.
 
-Both players need the **same NestCoop version**; otherwise the host refuses the connection.
+Both players need the **same NestCoop version and the same game version**; otherwise the host refuses the connection
+and the guest is told exactly what differs.
 
 ## Keys (change them in `[NestCoop]` in MelonPreferences.cfg)
 | Key | Action |
@@ -45,7 +46,8 @@ Both players need the **same NestCoop version**; otherwise the host refuses the 
 - Resuming from a checkpoint isn't shared: guests start the mission fresh.
 - Only the host can start, leave or finish missions.
 - Carried items (cards, map tokens, records) aren't synced yet.
-- Leaderboard: don't submit scores while modded (protection is planned).
+- Leaderboards: any run that had a co-op session is automatically kept off the leaderboards (the game's own opt-out is
+  switched on for that run). Solo runs with the mod installed still count.
 
 ## Uninstall
 Remove it in r2modman. It doesn't change any game files.

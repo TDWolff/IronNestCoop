@@ -24,6 +24,7 @@
 //   4 ControlGrab:  string id, bool grabbed, float value
 //   6 MissionState: byte phase, string operationId, string missionId, int32 seed
 //   7 MissionEvent: byte kind (1 = FinishMission)
+//   9 PlayerLeft:   int32 playerId
 //   8 PlayerPose:   int32 playerId, 3 x float feet, 4 x float head rotation (x,y,z,w), bool crouched (unreliable)
 //   5 TurretState:  float angle, float desired, float velocity, int32 n, n x float gunElevation (unreliable)
 using System.Collections.Concurrent;
@@ -31,8 +32,11 @@ using LiteNetLib;
 
 string address = args.Length > 0 ? args[0] : "127.0.0.1";
 int port = args.Length > 1 ? int.Parse(args[1]) : 27960;
-string version = args.Length > 2 ? args[2] : "0.6.0";
-string key = "NestCoop-" + version;
+// Key format (M9): "NestCoop|<mod version>|<game build>". FakePeer can't know the game build, so it connects with a
+// placeholder, gets REJECTED with the host's key (that exercises the version-mismatch path), then reconnects with it.
+string version = args.Length > 2 ? args[2] : "0.8.0";
+string key = args.Length > 3 ? args[3] : $"NestCoop|{version}|fakepeer";
+bool retriedWithHostKey = false;
 
 const byte ButtonPress = 1, ReloadState = 2, ControlValue = 3, ControlGrab = 4, TurretState = 5, MissionState = 6, MissionEvent = 7, PlayerPose = 8;
 float hx = 0, hy = 0, hz = 0, hostYaw = 0, hostYawAtStart = 0; bool haveHostPose = false;
@@ -56,7 +60,18 @@ var listener = new EventBasedNetListener();
 var manager = new NetManager(listener) { AutoRecycle = true, DisconnectTimeout = 10000 };
 
 listener.PeerConnectedEvent += p => { host = p; Console.WriteLine("[connected to host] commands: list | again | send <n> | press <id> | reload <n> <i> | controls | drag <n> <delta> [s] | turret | mission <p> | walk [r] | stand | still | quit"); };
-listener.PeerDisconnectedEvent += (p, info) => { host = null; Console.WriteLine($"[disconnected: {info.Reason}]"); };
+listener.PeerDisconnectedEvent += (p, info) =>
+{
+    host = null;
+    if (info.Reason == DisconnectReason.ConnectionRejected && info.AdditionalData != null && info.AdditionalData.AvailableBytes > 0)
+    {
+        string hostKey = System.Text.Encoding.UTF8.GetString(info.AdditionalData.GetRemainingBytes());
+        Console.WriteLine($"[rejected: host key is '{hostKey}', ours was '{key}']");
+        if (!retriedWithHostKey) { retriedWithHostKey = true; key = hostKey; Console.WriteLine("[reconnecting with the host's key]"); manager.Connect(address, port, key); }
+        return;
+    }
+    Console.WriteLine($"[disconnected: {info.Reason}]");
+};
 listener.NetworkReceiveEvent += (p, reader, ch, method) =>
 {
     using var r = new BinaryReader(new MemoryStream(reader.GetRemainingBytes()));
@@ -110,6 +125,9 @@ listener.NetworkReceiveEvent += (p, reader, ch, method) =>
         }
         case MissionEvent:
             Console.WriteLine($"<- mission event {(r.ReadByte() == 1 ? "FinishMission" : "?")}");
+            break;
+        case 9: // PlayerLeft
+            Console.WriteLine($"<- player {r.ReadInt32()} left");
             break;
         case PlayerPose:
         {

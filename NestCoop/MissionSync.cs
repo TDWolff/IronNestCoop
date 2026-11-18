@@ -52,7 +52,7 @@ internal static class MissionSync
     /// <summary>Host/offline: a mission is about to load — pick its seed (not when applying a remote change).</summary>
     public static void BeforeLocalMissionLoad()
     {
-        if (Net.ApplyingRemote || Net.Role == Role.Guest) return;
+        if (Net.ApplyingRemote || Net.Role != Role.Host) return; // solo play keeps the game's own randomness
         // Resume → StartOperation → LoadMission all hit this in one frame (M6 test picked 3 seeds); keep the first.
         if (seedFrame == Time.frameCount) return;
         seedFrame = Time.frameCount;
@@ -220,5 +220,5 @@ internal static class MissionSync
         Apply(st, "debug replay");
     }
 
-    public static void Reset() { lastSent = null; }
+    public static void Reset() { lastSent = null; HasPendingSeed = false; }
 }

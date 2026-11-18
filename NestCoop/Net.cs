@@ -13,6 +13,7 @@ internal enum MsgType : byte
     ControlGrab = 4,   // string id, bool grabbed, float v  (dragger → host → others) reliable
     MissionState = 6,  // byte phase, string operationId, string missionId, int seed (host → guests, join snapshot)
     MissionEvent = 7,  // byte kind (1 = FinishMission)                         (host → guests)
+    PlayerLeft = 9,    // int playerId                                         (host → guests)
     PlayerPose = 8,    // int playerId, 3×float feet, 4×float head rotation, bool crouched (unreliable; host relays)
     TurretState = 5,   // float angle, float desired, float velocity, int n, n×float gunElevation (host → guests)
 }
@@ -64,7 +65,15 @@ internal static class Net
         Overlay.Toast(msg);
     }
 
-    static string ConnectionKey => "NestCoop-" + Mod.Version;
+    /// <summary>Mod version + game build (M9). Mismatched peers are rejected with an explanation.</summary>
+    static string ConnectionKey => VersionCheck.Key;
+
+    /// <summary>Stops requested from inside transport callbacks run after Poll returns (never stop a transport
+    /// from inside its own event handler).</summary>
+    static string pendingStop;
+    static bool pendingStopQuiet;
+
+    static void RequestStop(string why, bool quiet) { pendingStop ??= why; pendingStopQuiet |= quiet; }
 
     public static void StartHost()
     {
@@ -86,10 +95,11 @@ internal static class Net
         if (!UseSteam) Say($"Joining {address}:{Mod.Port.Value} ...");
     }
 
-    public static void Stop(string why)
+    /// <param name="quiet">True when a more specific message was already shown (e.g. a version mismatch).</param>
+    public static void Stop(string why, bool quiet = false)
     {
         if (transport == null) return;
-        Say($"Disconnected ({why})");
+        if (quiet) Mod.Log.Msg($"Net: stopped ({why})"); else Say($"Disconnected ({why})");
         var t = transport;
         transport = null;   // first, so nothing can send during teardown
         Role = Role.None;
@@ -105,8 +115,9 @@ internal static class Net
     {
         if (transport == null) return;
         transport.Poll();
+        if (pendingStop != null) { var why = pendingStop; bool q = pendingStopQuiet; pendingStop = null; pendingStopQuiet = false; Stop(why, q); return; }
         // A transport can give up on its own (Steam: host rejected us / never answered).
-        if (transport != null && !transport.IsRunning) Stop("connection closed");
+        if (transport != null && !transport.IsRunning) Stop("connection closed", quiet: true);
     }
 
     internal static bool UseSteam => string.Equals(Mod.TransportName.Value, "Steam", StringComparison.OrdinalIgnoreCase);
@@ -123,10 +134,23 @@ internal static class Net
         t.PeerDisconnected += (id, reason) =>
         {
             peers.Remove(id);
+            if (Role == Role.Guest)
+            {
+                Say($"Host {reason}");
+                RequestStop("lost host", quiet: true);
+                return;
+            }
+            // Host: clean up after the guest and tell everyone else.
             ControlSync.OnPeerLeft(id);
             Avatars.OnPeerLeft(id);
-            Say(Role == Role.Guest ? $"Host left ({reason})" : $"Guest #{id} left ({reason})");
-            if (Role == Role.Guest) Stop("lost host");
+            Broadcast(Write(MsgType.PlayerLeft, w => w.Write(id)), reliable: true);
+            Say($"Guest #{id} {reason}");
+        };
+        t.ConnectFailed += why =>
+        {
+            Mod.Log.Warning($"Net: couldn't join: {why}");
+            Overlay.Toast(why, 12f);
+            RequestStop("couldn't join", quiet: true);
         };
         t.Received += OnReceived;
         return t;
@@ -252,6 +276,12 @@ internal static class Net
                 case MsgType.TurretState:
                     ControlSync.Handle(type, from, r, data);
                     break;
+                case MsgType.PlayerLeft:
+                {
+                    int who = r.ReadInt32();
+                    if (Role == Role.Guest) { Avatars.RemovePlayer(who, "left"); Say($"Player {who} left"); }
+                    break;
+                }
                 case MsgType.PlayerPose:
                     Avatars.Handle(from, r);
                     break;

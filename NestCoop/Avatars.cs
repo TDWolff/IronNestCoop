@@ -209,6 +209,8 @@ internal static class Avatars
         foreach (var id in avatars.Keys.ToList()) Remove(id, "session ended");
     }
 
+    public static void RemovePlayer(int id, string why) => Remove(id, why);
+
     static void Remove(int id, string why)
     {
         if (!avatars.Remove(id, out var a)) return;

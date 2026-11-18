@@ -33,4 +33,7 @@ internal interface ITransport
     event Action<int> PeerConnected;
     event Action<int, string> PeerDisconnected;
     event Action<int, byte[]> Received;
+
+    /// <summary>Guest only: the connection attempt failed (rejected, version mismatch, unreachable). Human-readable reason.</summary>
+    event Action<string> ConnectFailed;
 }

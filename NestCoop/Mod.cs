@@ -9,7 +9,7 @@ namespace NestCoop;
 public class Mod : MelonMod
 {
     /// <summary>Also part of the network connection key: different versions refuse to connect.</summary>
-    public const string Version = "0.7.0";
+    public const string Version = "0.8.0";
 
     internal static MelonLogger.Instance Log;
     internal static MelonPreferences_Entry<bool> DebugLog;
@@ -44,7 +44,7 @@ public class Mod : MelonMod
         PoseHz = cat.CreateEntry("PoseHz", 15, description: "How often your player position/look is sent (per second).");
         AvatarTimeout = cat.CreateEntry("AvatarTimeout", 5f, description: "Remove a remote player's avatar after this many seconds without an update.");
         TurretSnapDegrees = cat.CreateEntry("TurretSnapDegrees", 5f, description: "Guest snaps to the host turret angle when further off than this; smaller errors are blended.");
-        Log.Msg($"NestCoop {Version} loaded. Menu={MenuKey.Value} Transport={TransportName.Value} Host={HostKey.Value} Join={JoinKey.Value} Leave={LeaveKey.Value} Replay={ReplayKey.Value} SteamCheck={SteamCheckKey.Value}");
+        Log.Msg($"NestCoop {Version} loaded (key {VersionCheck.Key}). Menu={MenuKey.Value} Transport={TransportName.Value} Host={HostKey.Value} Join={JoinKey.Value} Leave={LeaveKey.Value} Replay={ReplayKey.Value} SteamCheck={SteamCheckKey.Value}");
     }
 
     public override void OnLateInitializeMelon()
@@ -60,6 +60,7 @@ public class Mod : MelonMod
         Net.Poll();
         ControlSync.Update();
         Avatars.Update();
+        LeaderboardGuard.Update();
         Menu.CoopMenu.Update();
         Terminal.Update();
     }

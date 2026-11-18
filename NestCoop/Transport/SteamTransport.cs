@@ -32,6 +32,7 @@ internal sealed class SteamTransport : ITransport
     public event Action<int> PeerConnected;
     public event Action<int, string> PeerDisconnected;
     public event Action<int, byte[]> Received;
+    public event Action<string> ConnectFailed;
 
     public SteamTransport(string connectionKey) { key = connectionKey; }
 
@@ -106,7 +107,7 @@ internal sealed class SteamTransport : ITransport
 
         if (!isHost && !idOf.ContainsKey(target))
         {
-            if (now - connectStarted > 20f) { Mod.Log.Warning("Steam: host didn't answer in 20 s"); Overlay.Toast("Host didn't answer (is NestCoop hosting there?)"); Stop(); return; }
+            if (now - connectStarted > 20f) { Mod.Log.Warning("Steam: host didn't answer in 20 s"); ConnectFailed?.Invoke("Host didn't answer (are they hosting with NestCoop, same version?)"); Stop(); return; }
             if (now >= nextHello) { nextHello = now + 1f; SendControl(target, Ctl.Hello, key); }
         }
 
@@ -147,7 +148,7 @@ internal sealed class SteamTransport : ITransport
                 if (text != key)
                 {
                     Mod.Log.Warning($"Steam: rejected {SteamApi.NameOf(from)} ({from}): their version '{text}', ours '{key}'");
-                    SendControl(from, Ctl.Reject, $"version mismatch: host has {key}");
+                    SendControl(from, Ctl.Reject, key); // our key: the guest explains the difference
                     break;
                 }
                 SendControl(from, Ctl.Welcome, "");
@@ -158,7 +159,7 @@ internal sealed class SteamTransport : ITransport
                 break;
             case Ctl.Reject when !isHost && from == target:
                 Mod.Log.Warning($"Steam: host rejected us: {text}");
-                Overlay.Toast($"Host rejected: {text}");
+                ConnectFailed?.Invoke(VersionCheck.LooksLikeNestCoop(text) ? VersionCheck.Explain(text) : $"Host rejected: {text}");
                 Stop();
                 break;
             case Ctl.Bye:

@@ -391,3 +391,23 @@ draggables (spawned at runtime — will need `MissionSaveIdentity` instead).
 - **Swap test ✅:** both directions work (`Esc menu opening — closing the co-op menu` / `closing the Esc menu to show
   the co-op menu` + `TrySetOpen open=False`). `HandleActionStarted` and `TrySetOpen` fire; `SetOpenState` never did
   (inlined) — the backstop patches were the ones that mattered.
+
+## Milestone 9: polish (2026-11-17, v0.8.0) — built, untested
+
+- **Version check (`VersionCheck.cs`):** key = `NestCoop|<mod>|<Application.version>/<buildGUID[..8]>`. LiteNetLib host
+  reads the key from `ConnectionRequest.Data`, accepts only an exact match, and rejects other NestCoop keys with its own
+  key as reject data (`DisconnectInfo.AdditionalData` on the guest) → "Version mismatch — NestCoop: host has X, you have
+  Y; game build: …". Steam transport does the same via Hello/Reject. Transports raise `ConnectFailed(reason)`.
+- **Disconnects:** friendly reasons (left / timed out / couldn't reach host). Stops requested inside transport
+  callbacks are deferred to after Poll. Host broadcasts `PlayerLeft` (msg 9) → guests remove that avatar at once; host
+  also broadcasts releases for any control the leaver held. Guest losing the host shows "Host <reason>" and resets.
+- **Leaderboards (`LeaderboardGuard.cs`):** the game's own opt-out `LeaderboardManager.get_OptOut` (static) is forced
+  true for any run tainted by a co-op session; `SteamLeaderboardScoreController.SubmitScoreInternal` skipped too. A mission
+  started while not connected clears the taint.
+- **Fix:** solo play no longer forces FireMission seeds (only the host picks seeds); seed state cleared on session end.
+- FakePeer connects with a placeholder key, gets rejected with the host's key (tests the mismatch path), reconnects.
+- **M9 test ✅ (FakePeer, localhost):** key `NestCoop|0.8.0|1.0/56945c58`; FakePeer's placeholder key rejected
+  (`rejected a connection with key 'NestCoop|0.8.0|fakepeer'`), reconnected with the host key and joined; avatar
+  removed the moment it quit (`removed player 1 (left)` + "Guest #1 left the session"); leaderboard taint logged and
+  `LeaderboardManager.OptOut` forced (FIRST HIT); joining with no host → "couldn't reach the host" after ~5.6 s, clean
+  stop. Not testable locally: PlayerLeft reaching other guests, guest-side "Host left", Steam Reject text.
