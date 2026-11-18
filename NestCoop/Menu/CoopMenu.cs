@@ -68,6 +68,29 @@ internal static class CoopMenu
     public static void Resync() { Clicked("Resync from host"); Snapshot.RequestResync(); }
     public static void Leave() { Clicked("Leave"); Net.Stop("left via menu"); }
 
+    // ---------------- Kick (host) ----------------
+    // Two clicks: the first arms it for 4 s ("Click again to kick <name>"), the second kicks.
+
+    static int armedKick = -1;
+    static float armedUntil;
+
+    /// <summary>Host: the guests that can be kicked (id, plain name).</summary>
+    public static IEnumerable<(int id, string name)> Kickable => Net.Role == Role.Host
+        ? Net.Peers.Select(p => (p.id, Avatars.NameOf(p.id))).ToList()
+        : Enumerable.Empty<(int, string)>();
+
+    public static bool KickArmed(int id) => armedKick == id && Time.unscaledTime < armedUntil;
+
+    public static string KickLabel(int id, string name) => KickArmed(id) ? $"Click again to kick {name}" : $"Kick {name}";
+
+    public static void Kick(int id)
+    {
+        if (!KickArmed(id)) { armedKick = id; armedUntil = Time.unscaledTime + 4f; Clicked($"kick {id} (armed)"); return; }
+        armedKick = -1;
+        Clicked($"kick {id}");
+        Net.Kick(id);
+    }
+
     /// <summary>Latest result message ("Hosting via Steam", "No Steam friends are playing ..."), shown in the menu.</summary>
     public static string LastMessage => Overlay.LastMessage != null && Time.unscaledTime - Overlay.LastMessageTime < 15f ? Overlay.LastMessage : null;
 

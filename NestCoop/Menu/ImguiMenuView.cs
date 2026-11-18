@@ -97,7 +97,16 @@ internal sealed class ImguiMenuView : IMenuView
         // --- Players ---
         GUI.Label(Next(), CoopMenu.Role == Role.Host ? "<b>Connected guests</b>" : "<b>Connected to</b>");
         int n = 0;
-        foreach (var (_, name) in CoopMenu.Peers) { GUI.Label(Next(22), $"   • {name}"); n++; }
+        var kickNames = CoopMenu.Kickable.ToDictionary(k => k.id, k => k.name);
+        foreach (var (id, name) in CoopMenu.Peers)
+        {
+            var r = Next(22);
+            n++;
+            if (!kickNames.TryGetValue(id, out var plain)) { GUI.Label(r, $"   • {name}"); continue; }
+            const float bw = 190;
+            GUI.Label(new Rect(r.x, r.y, r.width - bw - Gap, r.height), $"   • {name}");
+            if (Button(new Rect(r.xMax - bw, r.y, bw, r.height), CoopMenu.KickArmed(id) ? "Click again to kick" : "Kick")) CoopMenu.Kick(id);
+        }
         if (n == 0) GUI.Label(Next(22), CoopMenu.Connected ? "   (nobody yet)" : "   (not connected)");
         Space();
 

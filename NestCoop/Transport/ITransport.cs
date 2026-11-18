@@ -30,6 +30,8 @@ internal interface ITransport
     /// <summary>Human-readable name for a connected peer (Steam name, or "Guest #n").</summary>
     string DescribePeer(int peer);
 
+    /// <summary>Host: remove one guest, telling them why (VersionCheck.Kicked). Steam also refuses them until hosting stops.</summary>
+    void Kick(int peer);
     /// <summary>Disconnect everyone and close the socket.</summary>
     void Stop();
 

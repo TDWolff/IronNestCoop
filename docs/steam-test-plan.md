@@ -75,3 +75,8 @@ Both players' newest files from `UserData/NestCoop/logs/`, plus anything that lo
 - [ ] Picking a card up to your clipboard → it disappears for the other; putting it down → it reappears there.
 - [ ] Both grab the same item at once → whoever lets go last wins; no errors in either log.
 - [ ] Logs (DebugLog on): `ItemSync: sent …` on the mover, `FIRST HIT ItemSync.Apply …` on the other.
+
+## Kick (host tool)
+- [ ] Host: ` → Kick <friend> → label turns into "Click again to kick …" → click again → friend is disconnected and
+      sees "The host removed you from the session."; their head disappears for the host.
+- [ ] Friend tries to join again (menu or invite) → refused with the same message, until the host stops hosting.

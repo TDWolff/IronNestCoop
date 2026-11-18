@@ -62,7 +62,12 @@ internal sealed class LiteNetTransport : ITransport
                 return;
             }
             peerOf.Remove(id);
-            PeerDisconnected?.Invoke(id, Friendly(info.Reason));
+            string reason = Friendly(info.Reason);
+            if (info.AdditionalData != null && info.AdditionalData.AvailableBytes > 0)
+            {
+                try { if (System.Text.Encoding.UTF8.GetString(info.AdditionalData.GetRemainingBytes()) == VersionCheck.Kicked) reason = "removed you from the session"; } catch { }
+            }
+            PeerDisconnected?.Invoke(id, reason);
         };
         listener.NetworkReceiveEvent += (peer, reader, channel, method) =>
         {
@@ -70,6 +75,12 @@ internal sealed class LiteNetTransport : ITransport
             Received?.Invoke(id, reader.GetRemainingBytes());
         };
         listener.NetworkErrorEvent += (endPoint, error) => Mod.Log.Warning($"Net error from {endPoint}: {error}");
+    }
+
+    /// <summary>Localhost testing: disconnect with the Kicked payload. No ban — every local joiner has the same address.</summary>
+    public void Kick(int peer)
+    {
+        if (peerOf.TryGetValue(peer, out var p)) p.Disconnect(System.Text.Encoding.UTF8.GetBytes(VersionCheck.Kicked));
     }
 
     public bool IsRunning => manager.IsRunning;

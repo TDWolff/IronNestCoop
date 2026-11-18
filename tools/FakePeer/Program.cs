@@ -80,6 +80,9 @@ listener.PeerDisconnectedEvent += (p, info) =>
         if (!retriedWithHostKey) { retriedWithHostKey = true; key = hostKey; Console.WriteLine("[reconnecting with the host's key]"); manager.Connect(address, port, key); }
         return;
     }
+    if (info.AdditionalData != null && info.AdditionalData.AvailableBytes > 0 &&
+        System.Text.Encoding.UTF8.GetString(info.AdditionalData.GetRemainingBytes()) == "NestCoop|KICKED")
+    { Console.WriteLine("[kicked: the host removed us from the session]"); return; }
     Console.WriteLine($"[disconnected: {info.Reason}]");
 };
 listener.NetworkReceiveEvent += (p, reader, ch, method) =>

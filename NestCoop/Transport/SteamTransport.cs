@@ -25,6 +25,7 @@ internal sealed class SteamTransport : ITransport
     readonly Dictionary<ulong, int> idOf = new();
     readonly Dictionary<int, ulong> steamOf = new();
     readonly Dictionary<ulong, float> lastHeard = new();
+    readonly HashSet<ulong> kicked = new(); // refused until hosting stops
     int nextId = 1;
     bool running, isHost;
 
@@ -157,6 +158,11 @@ internal sealed class SteamTransport : ITransport
                     SendControl(from, Ctl.Reject, key); // our key: the guest explains the difference
                     break;
                 }
+                if (kicked.Contains(from))
+                {
+                    SendControl(from, Ctl.Reject, VersionCheck.Kicked);
+                    break;
+                }
                 if (!idOf.ContainsKey(from) && idOf.Count + 1 >= Mod.MaxPlayers.Value)
                 {
                     SendControl(from, Ctl.Reject, VersionCheck.Full);
@@ -208,6 +214,15 @@ internal sealed class SteamTransport : ITransport
         PeerDisconnected?.Invoke(id, $"{SteamApi.NameOf(sid)} {reason}");
     }
 
+    public void Kick(int peer)
+    {
+        if (!isHost || !steamOf.TryGetValue(peer, out ulong sid)) return;
+        kicked.Add(sid);
+        Mod.Log.Msg($"Steam: kicked {SteamApi.NameOf(sid)} ({sid}); refused until hosting stops");
+        SendControl(sid, Ctl.Reject, VersionCheck.Kicked); // the guest shows why and disconnects
+        Drop(sid, "was removed by the host");
+    }
+
     void SendControl(ulong to, Ctl ctl, string text)
     {
         var t = System.Text.Encoding.UTF8.GetBytes(text ?? "");
@@ -254,6 +269,6 @@ internal sealed class SteamTransport : ITransport
             SteamApi.Close(sid);
         }
         if (!isHost && target != 0) SteamApi.Close(target);
-        idOf.Clear(); steamOf.Clear(); lastHeard.Clear(); rtt.Clear();
+        idOf.Clear(); steamOf.Clear(); lastHeard.Clear(); rtt.Clear(); kicked.Clear();
     }
 }

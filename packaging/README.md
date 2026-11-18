@@ -30,6 +30,7 @@ Then:
 - **Guest:** be friends with the host on Steam and either accept their invite, or be in the game and pick
   ` → **Join <host's name>**.
 - **Leave:** ` → **Leave session**. A guest who picks *Return to Main Menu / Return to Map* in the Esc menu also leaves.
+- **Kick (host):** ` → **Kick <name>**, then click it again to confirm. They can't rejoin until you stop hosting.
 
 Instead of the ` key you can use the **NestCoop Terminal**, an orange button on the safe box by the computer desk.
 

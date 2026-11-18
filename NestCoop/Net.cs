@@ -112,6 +112,15 @@ internal static class Net
         if (!UseSteam) Say($"Joining {address}:{Mod.Port.Value} ...");
     }
 
+    /// <summary>Host: remove a guest from the session (they're told why; over Steam they can't rejoin until you stop hosting).</summary>
+    public static void Kick(int peer)
+    {
+        if (Role != Role.Host || transport == null || !peers.Contains(peer)) return;
+        Mod.Log.Msg($"Net: kicking {Avatars.NameOf(peer)} (peer #{peer})");
+        Say($"Removed {Avatars.NameOf(peer)} from the session");
+        transport.Kick(peer);
+    }
+
     /// <param name="quiet">True when a more specific message was already shown (e.g. a version mismatch).</param>
     public static void Stop(string why, bool quiet = false)
     {

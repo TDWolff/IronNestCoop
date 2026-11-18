@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+- **Host can kick players:** in the co-op menu each guest has **Kick <name>** (click twice to confirm). They're told
+  the host removed them, and over Steam they can't rejoin until the host stops hosting.
+
 ## 0.9.9
 - **Carried items are synced:** punchcards, map tokens and cards someone moves, slots or puts in a deck end up in
   the same place for everyone (placed with the game's own checkpoint code). An item on a player's clipboard is
