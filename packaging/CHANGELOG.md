@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.9.11
+- First release on Thunderstore (install it from r2modman's Online tab). No gameplay changes since 0.9.10.
+
 ## 0.9.10
 - **Host can kick players:** in the co-op menu each guest has **Kick <name>** (click twice to confirm). They're told
   the host removed them, and over Steam they can't rejoin until the host stops hosting.

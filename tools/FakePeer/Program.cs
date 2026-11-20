@@ -42,7 +42,7 @@ string address = args.Length > 0 ? args[0] : "127.0.0.1";
 int port = args.Length > 1 ? int.Parse(args[1]) : 27960;
 // Key format (M9): "NestCoop|<mod version>|<game build>". FakePeer can't know the game build, so it connects with a
 // placeholder, gets REJECTED with the host's key (that exercises the version-mismatch path), then reconnects with it.
-string version = args.Length > 2 ? args[2] : "0.9.10";
+string version = args.Length > 2 ? args[2] : "0.9.11";
 string key = args.Length > 3 ? args[3] : $"NestCoop|{version}|fakepeer";
 bool retriedWithHostKey = false;
 string myName = args.Length > 4 ? args[4] : "FakePeer";
